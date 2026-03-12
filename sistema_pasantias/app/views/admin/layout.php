@@ -25,6 +25,11 @@ $meta = [
         'heading' => 'Reportes del centro',
         'description' => 'Lee indicadores utiles del sistema de pasantias por area tecnica y estado operativo.',
     ],
+    'areas' => [
+        'title' => 'Areas Tecnicas - Sistema EPIC',
+        'heading' => 'Areas tecnicas del centro',
+        'description' => 'Agrega nuevas areas o quita las que ya no necesitas sin depender de cambios en el codigo.',
+    ],
 ];
 
 $pageMeta = $meta[$currentSection] ?? $meta['dashboard'];
@@ -86,6 +91,7 @@ $formatDate = function ($value, $withTime = false) {
                 <a href="index.php?page=admin-students" class="nav-item<?php echo $currentSection === 'students' ? ' active' : ''; ?>"><i class="fas fa-users nav-icon"></i>Estudiantes</a>
                 <a href="index.php?page=admin-evaluations" class="nav-item<?php echo $currentSection === 'evaluations' ? ' active' : ''; ?>"><i class="fas fa-clipboard-check nav-icon"></i>Evaluaciones</a>
                 <a href="index.php?page=admin-reports" class="nav-item<?php echo $currentSection === 'reports' ? ' active' : ''; ?>"><i class="fas fa-chart-column nav-icon"></i>Reportes</a>
+                <a href="index.php?page=admin-areas" class="nav-item<?php echo $currentSection === 'areas' ? ' active' : ''; ?>"><i class="fas fa-layer-group nav-icon"></i>Areas tecnicas</a>
             </nav>
 
             <div class="sidebar-footer">
@@ -128,6 +134,7 @@ $formatDate = function ($value, $withTime = false) {
                             <a href="index.php?page=admin-students" class="dropdown-item"><i class="fas fa-users"></i>Estudiantes</a>
                             <a href="index.php?page=admin-evaluations" class="dropdown-item"><i class="fas fa-clipboard-check"></i>Evaluaciones</a>
                             <a href="index.php?page=admin-reports" class="dropdown-item"><i class="fas fa-chart-line"></i>Reportes</a>
+                            <a href="index.php?page=admin-areas" class="dropdown-item"><i class="fas fa-layer-group"></i>Areas tecnicas</a>
                         </div>
                         <div class="dropdown-footer">
                             <a href="index.php?page=logout" class="dropdown-logout"><i class="fas fa-sign-out-alt"></i>Cerrar sesion</a>

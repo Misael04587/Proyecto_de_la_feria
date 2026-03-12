@@ -118,6 +118,13 @@
     gap: 20px;
 }
 
+.summary-strip > *,
+.module-grid > *,
+.admin-split > *,
+.report-grid > * {
+    min-width: 0;
+}
+
 .summary-strip {
     grid-template-columns: repeat(4, minmax(0, 1fr));
 }
@@ -132,6 +139,13 @@
 
 .report-grid {
     grid-template-columns: minmax(0, 1.2fr) minmax(320px, 1fr);
+}
+
+.report-side-stack {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+    min-width: 0;
 }
 
 .admin-card,
@@ -303,6 +317,16 @@
     outline: none;
 }
 
+.filter-group input {
+    width: 100%;
+    border: 1px solid rgba(66, 153, 225, 0.22);
+    border-radius: 12px;
+    padding: 12px 14px;
+    background: var(--white);
+    color: var(--dark);
+    outline: none;
+}
+
 .table-card-header,
 .side-card-header {
     display: flex;
@@ -323,6 +347,40 @@
 .data-table {
     width: 100%;
     border-collapse: collapse;
+}
+
+.table-scroll {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 6px;
+    border-radius: 16px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(66, 153, 225, 0.78) rgba(66, 153, 225, 0.12);
+}
+
+.table-scroll::-webkit-scrollbar {
+    height: 10px;
+}
+
+.table-scroll::-webkit-scrollbar-track {
+    background: rgba(66, 153, 225, 0.12);
+    border-radius: 999px;
+}
+
+.table-scroll::-webkit-scrollbar-thumb {
+    background: linear-gradient(90deg, var(--secondary), var(--primary));
+    border-radius: 999px;
+    border: 2px solid rgba(255, 255, 255, 0.9);
+}
+
+.table-scroll::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(90deg, #3182ce, #16365d);
+}
+
+.table-scroll .data-table {
+    min-width: 680px;
 }
 
 .data-table th,
@@ -389,6 +447,137 @@
     line-height: 1.7;
 }
 
+.area-form {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 14px;
+    align-items: end;
+}
+
+.area-input-group {
+    min-width: 0;
+}
+
+.area-text-input:focus {
+    border-color: rgba(66, 153, 225, 0.55);
+    box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.12);
+}
+
+.area-submit-btn {
+    width: auto;
+    padding: 14px 22px;
+}
+
+.area-suggestions {
+    margin-top: 22px;
+    display: grid;
+    gap: 14px;
+}
+
+.area-chip-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.area-chip-form {
+    margin: 0;
+}
+
+.area-chip-btn {
+    padding: 10px 14px;
+    border: 1px solid rgba(66, 153, 225, 0.2);
+    border-radius: 999px;
+    background: #edf6ff;
+    color: var(--primary);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: 0.2s ease;
+}
+
+.area-chip-btn:hover {
+    background: var(--secondary);
+    color: var(--white);
+}
+
+.area-note-card .compact-item {
+    background: linear-gradient(180deg, #f8fbff, #f2f7fd);
+}
+
+.area-admin-list {
+    display: grid;
+    gap: 18px;
+}
+
+.area-admin-item {
+    border: 1px solid var(--gray-200);
+    border-radius: 20px;
+    padding: 20px;
+    background: linear-gradient(180deg, #ffffff, #fbfdff);
+}
+
+.area-admin-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: flex-start;
+}
+
+.area-admin-head h3 {
+    color: var(--primary);
+    font-size: 22px;
+    font-weight: 800;
+    margin-bottom: 6px;
+    font-family: 'Montserrat', sans-serif;
+}
+
+.area-admin-head p {
+    color: var(--dark);
+    opacity: 0.76;
+    line-height: 1.6;
+}
+
+.area-admin-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 18px;
+}
+
+.area-admin-footer {
+    margin-top: 18px;
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    align-items: center;
+}
+
+.area-remove-form {
+    margin: 0;
+}
+
+.area-remove-btn {
+    padding: 12px 18px;
+    border: 1px solid rgba(245, 101, 101, 0.25);
+    border-radius: 12px;
+    background: #fff5f5;
+    color: #c53030;
+    font-weight: 700;
+    cursor: pointer;
+    transition: 0.2s ease;
+}
+
+.area-remove-btn:hover:not(:disabled) {
+    background: var(--danger);
+    color: var(--white);
+}
+
+.area-remove-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 .admin-footer {
     margin-top: 8px;
 }
@@ -434,9 +623,25 @@
         grid-template-columns: 1fr;
     }
 
+    .area-form,
+    .area-admin-footer,
+    .area-admin-head {
+        grid-template-columns: 1fr;
+        display: grid;
+    }
+
+    .area-admin-metrics {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     .data-table {
         display: block;
         overflow-x: auto;
         white-space: nowrap;
+    }
+
+    .table-scroll .data-table {
+        display: table;
+        overflow: visible;
     }
 }

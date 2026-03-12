@@ -46,7 +46,7 @@ class AdminController {
         $context = $this->buildBaseContext('companies');
         $centerId = (int) $context['centro']['id'];
         $filters = [
-            'area' => $this->sanitizeAreaFilter($_GET['area'] ?? ''),
+            'area' => $this->sanitizeAreaFilter($_GET['area'] ?? '', $centerId),
             'estado' => $this->sanitizeEnumFilter($_GET['estado'] ?? '', ['disponible', 'completo']),
         ];
 
@@ -100,7 +100,7 @@ class AdminController {
         $context = $this->buildBaseContext('students');
         $centerId = (int) $context['centro']['id'];
         $filters = [
-            'area' => $this->sanitizeAreaFilter($_GET['area'] ?? ''),
+            'area' => $this->sanitizeAreaFilter($_GET['area'] ?? '', $centerId),
             'cv' => $this->sanitizeEnumFilter($_GET['cv'] ?? '', ['con_cv', 'sin_cv']),
             'pasantia' => $this->sanitizeEnumFilter($_GET['pasantia'] ?? '', ['activa', 'sin_pasantia']),
         ];
@@ -168,7 +168,7 @@ class AdminController {
         $context = $this->buildBaseContext('evaluations');
         $centerId = (int) $context['centro']['id'];
         $filters = [
-            'area' => $this->sanitizeAreaFilter($_GET['area'] ?? ''),
+            'area' => $this->sanitizeAreaFilter($_GET['area'] ?? '', $centerId),
             'estado' => $this->sanitizeEnumFilter($_GET['estado'] ?? '', ['pendiente', 'aprobado', 'reprobado', 'anulado']),
         ];
 
@@ -217,7 +217,7 @@ class AdminController {
     public function reports() {
         $context = $this->buildBaseContext('reports');
         $centerId = (int) $context['centro']['id'];
-        $areas = $this->getAreaLabels();
+        $areas = $this->getAreaLabels($centerId);
 
         $companiesByArea = $this->keyByArea(Database::select("
             SELECT area_tecnica, COUNT(*) AS total, COALESCE(SUM(cupos), 0) AS cupos
@@ -303,6 +303,33 @@ class AdminController {
         $this->renderPage('reports', $context);
     }
 
+    public function manageAreas() {
+        $context = $this->buildBaseContext('areas');
+        $centerId = (int) $context['centro']['id'];
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $this->handleAreaManagement($centerId);
+        }
+
+        $context['csrfToken'] = Security::generateCSRFToken();
+        $context['areasOverview'] = AreaTecnica::getCenterAreasOverview($centerId);
+        $context['availableCatalogAreas'] = AreaTecnica::getCatalogAreasNotInCenter($centerId);
+        $context['areaSummary'] = [
+            'assigned' => count($context['areasOverview']),
+            'with_students' => count(array_filter($context['areasOverview'], function ($area) {
+                return (int) ($area['students'] ?? 0) > 0;
+            })),
+            'with_companies' => count(array_filter($context['areasOverview'], function ($area) {
+                return (int) ($area['companies'] ?? 0) > 0;
+            })),
+            'removable' => count(array_filter($context['areasOverview'], function ($area) {
+                return !empty($area['removable']);
+            })),
+        ];
+
+        $this->renderPage('areas', $context);
+    }
+
     private function buildBaseContext($section) {
         $this->guardAccess();
         $centro = $this->getCenterOrFail();
@@ -333,9 +360,11 @@ class AdminController {
             WHERE id = ?
             LIMIT 1
         ", [$_SESSION['centro_id'] ?? 0]);
+
         if (!$centro) {
             redirect('login', 'No se encontro la informacion del centro', 'error');
         }
+
         return $centro;
     }
 
@@ -354,17 +383,20 @@ class AdminController {
             FROM empresas
             WHERE centro_id = ?
         ", [$centerId]);
+
         $students = $this->fetchSingleValue("
             SELECT COUNT(*) AS total, SUM(CASE WHEN created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 1 ELSE 0 END) AS nuevos, SUM(CASE WHEN cv_path IS NOT NULL AND cv_path <> '' THEN 1 ELSE 0 END) AS con_cv
             FROM estudiantes
             WHERE centro_id = ?
         ", [$centerId]);
+
         $evaluations = $this->fetchSingleValue("
             SELECT COUNT(*) AS total, SUM(CASE WHEN ev.estado = 'pendiente' THEN 1 ELSE 0 END) AS pendientes, SUM(CASE WHEN ev.estado = 'aprobado' THEN 1 ELSE 0 END) AS aprobadas, SUM(CASE WHEN ev.estado = 'reprobado' THEN 1 ELSE 0 END) AS reprobadas, SUM(CASE WHEN ev.estado = 'anulado' THEN 1 ELSE 0 END) AS anuladas, AVG(ev.nota) AS promedio
             FROM evaluaciones ev
             JOIN estudiantes est ON est.id = ev.estudiante_id
             WHERE est.centro_id = ?
         ", [$centerId]);
+
         $assignments = $this->fetchSingleValue("
             SELECT COUNT(*) AS total, SUM(CASE WHEN a.estado = 'activa' THEN 1 ELSE 0 END) AS activas, SUM(CASE WHEN a.estado = 'finalizada' THEN 1 ELSE 0 END) AS finalizadas, SUM(CASE WHEN a.estado = 'cancelada' THEN 1 ELSE 0 END) AS canceladas
             FROM asignaciones a
@@ -394,12 +426,39 @@ class AdminController {
     }
 
     private function getAreaLabels($centerId = null) {
-        return [
-            'Gastronomia' => 'Gastronomía',
-            'Administracion' => 'Administración',
-            'Electricidad' => 'Electricidad',
-            'Informatica' => 'Informática',
-        ];
+        $areas = $centerId !== null
+            ? AreaTecnica::getAreasByCenterId((int) $centerId)
+            : AreaTecnica::getCatalog();
+
+        if ($centerId !== null && (int) $centerId > 0) {
+            $usedAreas = Database::select("
+                SELECT area_tecnica
+                FROM empresas
+                WHERE centro_id = ?
+                UNION
+                SELECT area_tecnica
+                FROM estudiantes
+                WHERE centro_id = ?
+                ORDER BY area_tecnica ASC
+            ", [(int) $centerId, (int) $centerId]);
+
+            foreach ($usedAreas as $row) {
+                $label = trim((string) ($row['area_tecnica'] ?? ''));
+                if ($label !== '' && !in_array($label, $areas, true)) {
+                    $areas[] = $label;
+                }
+            }
+        }
+
+        $labels = [];
+        foreach ($areas as $label) {
+            $key = $this->normalizeAreaKey($label);
+            if ($key !== '') {
+                $labels[$key] = $label;
+            }
+        }
+
+        return $labels;
     }
 
     private function keyByArea(array $rows) {
@@ -411,40 +470,65 @@ class AdminController {
     }
 
     private function normalizeAreaKey($value) {
-        $map = ['á' => 'a', 'Á' => 'A', 'ó' => 'o', 'Ó' => 'O', 'í' => 'i', 'Í' => 'I'];
-        $value = strtr((string) $value, $map);
         if (function_exists('iconv')) {
             $converted = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', (string) $value);
             if ($converted !== false) {
                 $value = $converted;
             }
         }
-        return preg_replace('/[^A-Za-z]/', '', $value);
+
+        $value = preg_replace('/[^A-Za-z0-9]+/', '', (string) $value);
+        return (string) $value;
     }
 
-    private function sanitizeAreaFilter($value) {
+    private function sanitizeAreaFilter($value, $centerId = null) {
         $key = $this->normalizeAreaKey($value);
-        foreach (AreaTecnica::getCatalog() as $label) {
+
+        foreach ($this->getAreaLabels($centerId) as $label) {
             if ($this->normalizeAreaKey($label) === $key) {
                 return $label;
             }
         }
-        return '';
-    }
 
-    private function denormalizeArea($key) {
-        $map = [
-            'Gastronomia' => 'Gastronomía',
-            'Administracion' => 'Administración',
-            'Electricidad' => 'Electricidad',
-            'Informatica' => 'Informática',
-        ];
-        return $map[$key] ?? '';
+        return '';
     }
 
     private function sanitizeEnumFilter($value, array $allowed) {
         $value = trim((string) $value);
         return in_array($value, $allowed, true) ? $value : '';
+    }
+
+    private function handleAreaManagement($centerId) {
+        if (!Security::validateCSRFToken($_POST['csrf_token'] ?? '')) {
+            redirect('admin-areas', 'Token de seguridad invalido', 'error');
+        }
+
+        $intent = trim((string) ($_POST['intent'] ?? ''));
+
+        try {
+            if ($intent === 'add') {
+                $result = AreaTecnica::addAreaToCenter($centerId, $_POST['area_name'] ?? '');
+
+                if (empty($result['assigned'])) {
+                    redirect('admin-areas', 'Esa area ya estaba activa en tu centro', 'info');
+                }
+
+                $message = !empty($result['created_catalog'])
+                    ? 'Area tecnica creada y asignada correctamente'
+                    : 'Area tecnica agregada al centro correctamente';
+
+                redirect('admin-areas', $message, 'success');
+            }
+
+            if ($intent === 'remove') {
+                AreaTecnica::removeAreaFromCenter($centerId, $_POST['area_name'] ?? '');
+                redirect('admin-areas', 'Area tecnica quitada del centro correctamente', 'success');
+            }
+
+            redirect('admin-areas', 'Accion de areas no reconocida', 'warning');
+        } catch (Throwable $exception) {
+            redirect('admin-areas', $exception->getMessage(), 'error');
+        }
     }
 
     private function guardAccess() {

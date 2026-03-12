@@ -108,6 +108,27 @@ $cvPendientes = max((int) ($stats['estudiantes'] ?? 0) - (int) ($stats['cv_subid
         </div>
         <a href="index.php?page=admin-reports" class="card-btn builder-primary-btn"><i class="fas fa-file-lines"></i> Abrir modulo</a>
     </article>
+
+    <article class="module-card">
+        <div class="module-head">
+            <div class="module-icon blue"><i class="fas fa-layer-group"></i></div>
+            <div>
+                <h2 class="module-title">Areas tecnicas</h2>
+                <p class="module-subtitle">Agrega nuevas areas o reorganiza las existentes del centro.</p>
+            </div>
+        </div>
+        <div class="metric-row">
+            <div class="metric-box">
+                <span class="summary-label">Activas</span>
+                <strong><?php echo count($areaLabels ?? []); ?></strong>
+            </div>
+            <div class="metric-box">
+                <span class="summary-label">Catalogo</span>
+                <strong><?php echo count(AreaTecnica::getCatalog()); ?></strong>
+            </div>
+        </div>
+        <a href="index.php?page=admin-areas" class="card-btn"><i class="fas fa-plus-circle"></i> Gestionar areas</a>
+    </article>
 </section>
 
 <section class="admin-split">

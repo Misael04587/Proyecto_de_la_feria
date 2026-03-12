@@ -99,7 +99,7 @@ $availableAreas = !empty($data['codigo_centro'])
                             <i class="icon fas fa-wand-magic-sparkles"></i>
                             <div class="readonly-box" id="matricula_preview">Se asignara automaticamente al crear la cuenta</div>
                         </div>
-                        <div class="hint">El sistema genera la siguiente matricula disponible para el centro en el ano actual.</div>
+
                     </div>
                 </div>
 
@@ -161,10 +161,11 @@ $availableAreas = !empty($data['codigo_centro'])
                             required
                         >
                             <option value="">Selecciona tu area</option>
-                            <option value="Gastronomía" <?php echo (($data['area_tecnica'] ?? '') === 'Gastronomía') ? 'selected' : ''; ?>>Gastronomía</option>
-                            <option value="Administración" <?php echo (($data['area_tecnica'] ?? '') === 'Administración') ? 'selected' : ''; ?>>Administración</option>
-                            <option value="Electricidad" <?php echo (($data['area_tecnica'] ?? '') === 'Electricidad') ? 'selected' : ''; ?>>Electricidad</option>
-                            <option value="Informática" <?php echo (($data['area_tecnica'] ?? '') === 'Informática') ? 'selected' : ''; ?>>Informática</option>
+                            <?php foreach ($availableAreas as $areaOption): ?>
+                            <option value="<?php echo htmlspecialchars($areaOption); ?>" <?php echo (($data['area_tecnica'] ?? '') === $areaOption) ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars($areaOption); ?>
+                            </option>
+                            <?php endforeach; ?>
                         </select>
                         <i class="select-arrow fas fa-chevron-down"></i>
                     </div>

@@ -35,35 +35,37 @@ $approvalRate = $evaluationsTotal > 0 ? round(((int) ($stats['evaluaciones_aprob
                 <p class="section-copy">Cruce simple de empresas, estudiantes, evaluaciones y pasantias por area.</p>
             </div>
         </div>
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Area</th>
-                    <th>Empresas</th>
-                    <th>Estudiantes</th>
-                    <th>Con CV</th>
-                    <th>Evaluaciones</th>
-                    <th>Aprobadas</th>
-                    <th>Activas</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach ($areaReport as $row): ?>
-                <tr>
-                    <td><strong><?php echo htmlspecialchars($row['label']); ?></strong><div class="muted-line"><?php echo (int) $row['slots']; ?> cupos</div></td>
-                    <td><?php echo (int) $row['companies']; ?></td>
-                    <td><?php echo (int) $row['students']; ?></td>
-                    <td><?php echo (int) $row['students_cv']; ?></td>
-                    <td><?php echo (int) $row['evaluations']; ?></td>
-                    <td><?php echo (int) $row['approved']; ?></td>
-                    <td><?php echo (int) $row['internships']; ?></td>
-                </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
+        <div class="table-scroll">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Area</th>
+                        <th>Empresas</th>
+                        <th>Estudiantes</th>
+                        <th>Con CV</th>
+                        <th>Evaluaciones</th>
+                        <th>Aprobadas</th>
+                        <th>Activas</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($areaReport as $row): ?>
+                    <tr>
+                        <td><strong><?php echo htmlspecialchars($row['label']); ?></strong><div class="muted-line"><?php echo (int) $row['slots']; ?> cupos</div></td>
+                        <td><?php echo (int) $row['companies']; ?></td>
+                        <td><?php echo (int) $row['students']; ?></td>
+                        <td><?php echo (int) $row['students_cv']; ?></td>
+                        <td><?php echo (int) $row['evaluations']; ?></td>
+                        <td><?php echo (int) $row['approved']; ?></td>
+                        <td><?php echo (int) $row['internships']; ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
     </article>
 
-    <div class="report-grid" style="grid-template-columns:1fr;gap:20px;">
+    <div class="report-side-stack">
         <article class="side-card">
             <div class="side-card-header">
                 <div>

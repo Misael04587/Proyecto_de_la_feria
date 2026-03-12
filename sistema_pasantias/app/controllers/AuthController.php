@@ -224,7 +224,7 @@ class AuthController {
             $errors['correo'] = 'Correo electronico invalido';
         }
 
-        $allowedAreas = ['Gastronomía', 'Administración', 'Electricidad', 'Informática'];
+        $allowedAreas = AreaTecnica::getDefaultAreas();
         if (!empty($data['codigo_centro']) && Security::isValidCenterCode($data['codigo_centro'])) {
             $center = Usuario::centerExists($data['codigo_centro']);
             if (!$center) {

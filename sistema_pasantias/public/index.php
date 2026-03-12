@@ -209,6 +209,7 @@ $controllerMap = [
     'admin-students' => ['AdminController', 'manageStudents'],
     'admin-evaluations' => ['AdminController', 'viewEvaluations'],
     'admin-reports' => ['AdminController', 'reports'],
+    'admin-areas' => ['AdminController', 'manageAreas'],
     
     // Super Admin
     'superadmin-dashboard' => ['SuperAdminController', 'dashboard'],
@@ -284,6 +285,7 @@ function checkRoutePermissions($page, $userRole) {
         'admin-students' => ['coordinador', 'admin_centro'],
         'admin-evaluations' => ['coordinador', 'admin_centro'],
         'admin-reports' => ['coordinador', 'admin_centro'],
+        'admin-areas' => ['coordinador', 'admin_centro'],
         
         // Rutas de super admin
         'superadmin-dashboard' => ['super_admin'],
