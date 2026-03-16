@@ -846,21 +846,6 @@ $focusTargetId = $focusTargetMap[$profileTab] ?? 'profileOverviewCard';
                                 <i class="fas fa-chart-bar"></i>
                                 Mis evaluaciones
                             </a>
-                            <a href="index.php?page=student-profile&tab=settings" class="dropdown-item">
-                                <i class="fas fa-cog"></i>
-                                Configuracion
-                            </a>
-
-                            <div class="dropdown-divider"></div>
-
-                            <a href="help.php" class="dropdown-item">
-                                <i class="fas fa-question-circle"></i>
-                                Ayuda
-                            </a>
-                            <a href="privacy.php" class="dropdown-item">
-                                <i class="fas fa-shield-alt"></i>
-                                Privacidad
-                            </a>
                         </div>
 
                         <div class="dropdown-footer">

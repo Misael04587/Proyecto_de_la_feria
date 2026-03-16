@@ -177,23 +177,7 @@ $evaluaciones_stats = Database::selectOne("
                                 <i class="fas fa-chart-bar"></i>
                                 Mis evaluaciones
                             </a>
-                            <a href="index.php?page=student-profile&tab=settings" class="dropdown-item">
-                                <i class="fas fa-cog"></i>
-                                Configuración
-                            </a>
-                            
-                            <div class="dropdown-divider"></div>
-                            
-                            <a href="help.php" class="dropdown-item">
-                                <i class="fas fa-question-circle"></i>
-                                Ayuda
-                            </a>
-                            <a href="privacy.php" class="dropdown-item">
-                                <i class="fas fa-shield-alt"></i>
-                                Privacidad
-                            </a>
                         </div>
-                        
                         <div class="dropdown-footer">
                             <a href="index.php?page=logout" class="dropdown-logout">
                                 <i class="fas fa-sign-out-alt"></i>
@@ -215,7 +199,7 @@ $evaluaciones_stats = Database::selectOne("
                 <!-- GRID DE 4 TARJETAS -->
                 <div class="cards-grid">
                     <!-- Tarjeta 1: Empresas Disponibles -->
-                    <div class="card">
+                    <div class="card panel-card panel-card-equal">
                         <div class="card-header">
                             <div class="card-icon icon-blue">
                                 <i class="fas fa-briefcase"></i>
@@ -315,7 +299,7 @@ $evaluaciones_stats = Database::selectOne("
 </div>
 
                     <!-- Tarjeta 3: Mis Evaluaciones - COMO LA IMAGEN -->
-                    <div class="card">
+                    <div class="card panel-card panel-card-equal">
                         <div class="card-header">
                             <div class="card-icon icon-orange">
                                 <i class="fas fa-clipboard-list"></i>
@@ -381,7 +365,7 @@ $evaluaciones_stats = Database::selectOne("
                         <a href="https://www.canva.com/s/templates?query=curriculum" target="_blank" rel="noopener noreferrer" class="card-btn builder-primary-btn">
                             <i class="fas fa-pen-ruler"></i> Crear en Canva
                         </a>
-                        <button type="button" class="builder-tips-link" id="openCvTips">
+                        <button type="button" class="builder-tips-link" id="openCvTips" style="margin-left: 38%;">
                             Consejos para un CV
                         </button>
                     </div>
@@ -649,3 +633,4 @@ deleteCVButton?.addEventListener('click', function() {
     </script>
 </body>
 </html>
+

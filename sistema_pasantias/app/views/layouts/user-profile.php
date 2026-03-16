@@ -59,7 +59,6 @@ $hasProfilePhoto = $avatarPath !== '' && file_exists(PUBLIC_PATH . $avatarPath);
                     <?php echo htmlspecialchars($estudiante['correo'] ?? ''); ?>
                 </div>
             </div>
-
             <div class="dropdown-menu">
                 <a href="index.php?page=student-profile" class="dropdown-item">
                     <i class="fas fa-user"></i>
@@ -73,23 +72,7 @@ $hasProfilePhoto = $avatarPath !== '' && file_exists(PUBLIC_PATH . $avatarPath);
                     <i class="fas fa-chart-bar"></i>
                     Mis evaluaciones
                 </a>
-                <a href="index.php?page=student-profile&tab=settings" class="dropdown-item">
-                    <i class="fas fa-cog"></i>
-                    Configuración
-                </a>
-
-                <div class="dropdown-divider"></div>
-
-                <a href="help.php" class="dropdown-item">
-                    <i class="fas fa-question-circle"></i>
-                    Ayuda
-                </a>
-                <a href="privacy.php" class="dropdown-item">
-                    <i class="fas fa-shield-alt"></i>
-                    Privacidad
-                </a>
             </div>
-
             <div class="dropdown-footer">
                 <a href="index.php?page=logout" class="dropdown-logout">
                     <i class="fas fa-sign-out-alt"></i>
@@ -110,19 +93,19 @@ $hasProfilePhoto = $avatarPath !== '' && file_exists(PUBLIC_PATH . $avatarPath);
 }
 
 .user-avatar {
-    width: 60px;
-    height: 60px;
+    width: 70px;
+    height: 70px;
     border-radius: 50%;
     overflow: hidden;
-    border: 2px solid var(--secondary);
-    box-shadow: 0 3px 10px rgba(66, 153, 225, 0.2);
+    border: 3px solid rgba(66, 153, 225, 0.95);
+    box-shadow: 0 6px 16px rgba(26, 54, 93, 0.18);
     transition: all 0.3s;
     cursor: pointer;
 }
 
 .user-avatar:hover {
-    transform: scale(1.1);
-    box-shadow: 0 5px 15px rgba(66, 153, 225, 0.3);
+    transform: scale(1.05);
+    box-shadow: 0 8px 20px rgba(26, 54, 93, 0.2);
 }
 
 .user-avatar img {
@@ -152,13 +135,13 @@ $hasProfilePhoto = $avatarPath !== '' && file_exists(PUBLIC_PATH . $avatarPath);
 
 .profile-dropdown {
     position: absolute;
-    top: 70px;
+    top: 82px;
     right: 0;
-    width: 280px;
-    background: var(--white);
-    border-radius: 12px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-    border: 1px solid var(--gray-200);
+    width: 336px;
+    background: linear-gradient(180deg, #fbfdff 0%, #f5f8fc 100%);
+    border-radius: 18px;
+    box-shadow: 0 20px 42px rgba(15, 23, 42, 0.16);
+    border: 1px solid #d9e2ee;
     z-index: 1000;
     display: none;
     animation: slideDown 0.2s ease-out;
@@ -180,20 +163,20 @@ $hasProfilePhoto = $avatarPath !== '' && file_exists(PUBLIC_PATH . $avatarPath);
 }
 
 .dropdown-header {
-    padding: 20px;
-    border-bottom: 1px solid var(--gray-200);
+    padding: 22px 22px 18px;
+    border-bottom: 1px solid #d7e0ec;
 }
 
 .dropdown-user {
     display: flex;
     align-items: center;
-    gap: 15px;
-    margin-bottom: 15px;
+    gap: 14px;
+    margin-bottom: 12px;
 }
 
 .dropdown-avatar-container {
-    width: 50px;
-    height: 50px;
+    width: 58px;
+    height: 58px;
     border-radius: 50%;
     overflow: hidden;
     border: 3px solid var(--secondary);
@@ -212,35 +195,35 @@ $hasProfilePhoto = $avatarPath !== '' && file_exists(PUBLIC_PATH . $avatarPath);
 
 .dropdown-user-info h4 {
     color: var(--primary);
-    font-weight: 700;
-    margin-bottom: 3px;
-    font-size: 16px;
+    font-weight: 800;
+    margin-bottom: 2px;
+    font-size: 17px;
 }
 
 .dropdown-user-info p {
     color: var(--dark);
-    font-size: 13px;
-    opacity: 0.8;
+    font-size: 14px;
+    opacity: 0.86;
 }
 
 .dropdown-user-email {
-    font-size: 14px;
+    font-size: 15px;
     color: var(--secondary);
-    font-weight: 500;
+    font-weight: 700;
 }
 
 .dropdown-menu {
-    padding: 10px 0;
+    padding: 12px 0;
 }
 
 .dropdown-item {
     display: flex;
     align-items: center;
-    padding: 12px 20px;
+    padding: 14px 22px;
     color: var(--dark);
     text-decoration: none;
     transition: all 0.2s;
-    font-size: 14px;
+    font-size: 15px;
 }
 
 .dropdown-item:hover {
@@ -257,13 +240,13 @@ $hasProfilePhoto = $avatarPath !== '' && file_exists(PUBLIC_PATH . $avatarPath);
 
 .dropdown-divider {
     height: 1px;
-    background: var(--gray-200);
-    margin: 8px 0;
+    background: #d7e0ec;
+    margin: 9px 0;
 }
 
 .dropdown-footer {
-    padding: 15px 20px;
-    border-top: 1px solid var(--gray-200);
+    padding: 18px 22px;
+    border-top: 1px solid #d7e0ec;
 }
 
 .dropdown-logout {
@@ -271,16 +254,18 @@ $hasProfilePhoto = $avatarPath !== '' && file_exists(PUBLIC_PATH . $avatarPath);
     align-items: center;
     justify-content: center;
     width: 100%;
-    padding: 10px;
-    background: var(--danger);
+    padding: 12px 14px;
+    background: #f16060;
     color: var(--white);
     border: none;
-    border-radius: 8px;
-    font-weight: 600;
-    font-size: 14px;
+    border-radius: 11px;
+    font-weight: 700;
+    font-size: 15px;
+    text-decoration: underline;
+    text-decoration-thickness: 1.5px;
+    text-underline-offset: 2px;
     cursor: pointer;
     transition: all 0.3s;
-    text-decoration: none;
 }
 
 .dropdown-logout:hover {
@@ -290,6 +275,18 @@ $hasProfilePhoto = $avatarPath !== '' && file_exists(PUBLIC_PATH . $avatarPath);
 
 .dropdown-logout i {
     margin-right: 8px;
+}
+
+@media (max-width: 768px) {
+    .user-avatar {
+        width: 62px;
+        height: 62px;
+    }
+
+    .profile-dropdown {
+        width: min(92vw, 336px);
+        right: -8px;
+    }
 }
 </style>
 
@@ -318,3 +315,4 @@ document.addEventListener('click', function(event) {
     }
 });
 </script>
+
