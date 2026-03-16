@@ -56,7 +56,9 @@ class StudentController {
             // Actualizar BD
             Database::execute("
                 UPDATE estudiantes 
-                SET cv_path = ? 
+                SET cv_path = ?,
+                    comentario_cv_admin = NULL,
+                    fecha_revision_cv = NULL
                 WHERE usuario_id = ?
             ", [$ruta_bd, $_SESSION['user_id']]);
 
@@ -111,7 +113,9 @@ class StudentController {
 
         Database::execute("
             UPDATE estudiantes
-            SET cv_path = NULL
+            SET cv_path = NULL,
+                comentario_cv_admin = NULL,
+                fecha_revision_cv = NULL
             WHERE usuario_id = ?
         ", [$_SESSION['user_id']]);
 

@@ -896,6 +896,38 @@
             line-height: 1.6;
         }
 
+        .cv-feedback-box {
+            margin-top: 16px;
+            padding: 14px 16px;
+            border-radius: 12px;
+            background: #fff8e6;
+            border-left: 4px solid #f6ad55;
+            color: #744210;
+        }
+
+        .cv-feedback-title {
+            font-size: 13px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-bottom: 8px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .cv-feedback-box p {
+            margin: 0;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .cv-feedback-date {
+            margin-top: 10px;
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
         .card-actions {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -948,8 +980,8 @@
             align-items: center;
             justify-content: center;
             text-align: center;
-            min-height: 210px;
-            margin-bottom: 18px;
+            min-height: 185px;
+            margin-bottom: 10px;
         }
 
         .builder-description {
@@ -957,14 +989,14 @@
             font-size: 16px;
             line-height: 1.7;
             max-width: 520px;
-            margin: 8px auto 26px;
+            margin: 4px auto 16px;
         }
 
         .builder-pill-list {
             display: flex;
             flex-wrap: wrap;
             justify-content: center;
-            gap: 10px;
+            gap: 8px;
         }
 
         .builder-pill {
@@ -988,6 +1020,130 @@
         .builder-primary-btn:hover {
             background: linear-gradient(90deg, #5d3df4, #ae2fca);
             box-shadow: 0 14px 26px rgba(143, 83, 255, 0.34);
+        }
+
+        .builder-tips-link {
+            margin-top: 10px;
+            background: transparent;
+            border: 0;
+            color: #6d4cff;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            text-decoration: underline;
+            text-underline-offset: 3px;
+        }
+
+        .builder-tips-link:hover {
+            color: #a333ff;
+        }
+
+        body.modal-open {
+            overflow: hidden;
+        }
+
+        .cv-tips-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 1500;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 14px;
+        }
+
+        .cv-tips-modal.active {
+            display: flex;
+        }
+
+        .cv-tips-backdrop {
+            position: absolute;
+            inset: 0;
+            background: rgba(31, 23, 54, 0.58);
+            backdrop-filter: blur(2px);
+        }
+
+        .cv-tips-dialog {
+            position: relative;
+            width: min(520px, 100%);
+            max-height: 74vh;
+            overflow-y: auto;
+            border-radius: 16px;
+            padding: 16px 14px 14px;
+            background:
+                radial-gradient(circle at top right, rgba(195, 60, 255, 0.2), transparent 45%),
+                linear-gradient(180deg, #ffffff 0%, #f8f3ff 100%);
+            border: 1px solid rgba(128, 90, 213, 0.2);
+            box-shadow: 0 20px 50px rgba(109, 76, 255, 0.25);
+            z-index: 1;
+        }
+
+        .cv-tips-close {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 30px;
+            height: 30px;
+            border: 0;
+            border-radius: 50%;
+            background: rgba(109, 76, 255, 0.12);
+            color: #6d4cff;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .cv-tips-close:hover {
+            background: rgba(109, 76, 255, 0.22);
+        }
+
+        .cv-tips-kicker {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 999px;
+            background: rgba(109, 76, 255, 0.12);
+            color: #6d4cff;
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-bottom: 6px;
+        }
+
+        .cv-tips-header h3 {
+            color: #432f90;
+            font-size: 20px;
+            margin-bottom: 6px;
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        .cv-tips-header p {
+            color: #4b3e77;
+            font-size: 13px;
+            line-height: 1.45;
+            margin-bottom: 10px;
+        }
+
+        .cv-tips-list {
+            list-style: none;
+            display: grid;
+            gap: 6px;
+        }
+
+        .cv-tips-list li {
+            background: rgba(109, 76, 255, 0.08);
+            border: 1px solid rgba(109, 76, 255, 0.14);
+            border-radius: 10px;
+            padding: 8px 10px;
+            color: #36285f;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+
+        .cv-tips-list strong {
+            display: block;
+            color: #5d3fd3;
+            margin-bottom: 2px;
+            font-size: 13px;
         }
 
         /* FOOTER */
@@ -1094,5 +1250,14 @@
 
             .card-actions {
                 grid-template-columns: 1fr;
+            }
+
+            .cv-tips-dialog {
+                width: min(460px, 100%);
+                padding: 14px 12px 12px;
+            }
+
+            .cv-tips-header h3 {
+                font-size: 18px;
             }
         }

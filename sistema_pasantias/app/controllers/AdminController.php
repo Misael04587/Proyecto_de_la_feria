@@ -99,6 +99,11 @@ class AdminController {
     public function manageStudents() {
         $context = $this->buildBaseContext('students');
         $centerId = (int) $context['centro']['id'];
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $this->handleStudentCvReview($centerId);
+        }
+
         $filters = [
             'area' => $this->sanitizeAreaFilter($_GET['area'] ?? '', $centerId),
             'cv' => $this->sanitizeEnumFilter($_GET['cv'] ?? '', ['con_cv', 'sin_cv']),
@@ -123,12 +128,15 @@ class AdminController {
         }
 
         $context['filters'] = $filters;
+        $context['csrfToken'] = Security::generateCSRFToken();
         $context['students'] = Database::select("
             SELECT
                 e.id,
                 e.matricula,
                 e.area_tecnica,
                 e.cv_path,
+                e.comentario_cv_admin,
+                e.fecha_revision_cv,
                 e.created_at,
                 u.nombre,
                 u.correo,
@@ -529,6 +537,74 @@ class AdminController {
         } catch (Throwable $exception) {
             redirect('admin-areas', $exception->getMessage(), 'error');
         }
+    }
+
+    private function handleStudentCvReview($centerId) {
+        if (!Security::validateCSRFToken($_POST['csrf_token'] ?? '')) {
+            redirect('admin-students', 'Token de seguridad invalido', 'error');
+        }
+
+        $intent = trim((string) ($_POST['intent'] ?? ''));
+        if ($intent !== 'save_cv_comment') {
+            redirect('admin-students', 'Accion de revision no reconocida', 'warning');
+        }
+
+        $studentId = (int) ($_POST['student_id'] ?? 0);
+        if ($studentId <= 0) {
+            redirect('admin-students', 'Selecciona un estudiante valido', 'error');
+        }
+
+        $student = Database::selectOne("
+            SELECT id, cv_path
+            FROM estudiantes
+            WHERE id = ? AND centro_id = ?
+            LIMIT 1
+        ", [$studentId, $centerId]);
+
+        if (!$student) {
+            redirect('admin-students', 'No se encontro el estudiante solicitado', 'error');
+        }
+
+        if (empty($student['cv_path'])) {
+            redirect('admin-students', 'Este estudiante aun no tiene un CV para revisar', 'warning');
+        }
+
+        $comment = trim((string) ($_POST['cv_comment'] ?? ''));
+        $commentLength = function_exists('mb_strlen')
+            ? mb_strlen($comment, 'UTF-8')
+            : strlen($comment);
+
+        if ($commentLength > 1200) {
+            redirect('admin-students', 'El comentario no puede superar 1200 caracteres', 'warning');
+        }
+
+        if ($comment === '') {
+            $updated = Database::execute("
+                UPDATE estudiantes
+                SET comentario_cv_admin = NULL,
+                    fecha_revision_cv = NULL
+                WHERE id = ? AND centro_id = ?
+            ", [$studentId, $centerId]);
+
+            if (!$updated) {
+                redirect('admin-students', 'No se pudo limpiar el comentario del CV', 'error');
+            }
+
+            redirect('admin-students', 'Comentario del CV eliminado', 'success');
+        }
+
+        $updated = Database::execute("
+            UPDATE estudiantes
+            SET comentario_cv_admin = ?,
+                fecha_revision_cv = NOW()
+            WHERE id = ? AND centro_id = ?
+        ", [$comment, $studentId, $centerId]);
+
+        if (!$updated) {
+            redirect('admin-students', 'No se pudo guardar el comentario del CV', 'error');
+        }
+
+        redirect('admin-students', 'Comentario del CV guardado correctamente', 'success');
     }
 
     private function guardAccess() {

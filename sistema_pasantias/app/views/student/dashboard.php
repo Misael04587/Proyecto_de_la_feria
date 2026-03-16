@@ -28,6 +28,14 @@ $cvPath = !empty($cv_info['cv_path']) ? ltrim(str_replace('\\', '/', $cv_info['c
 $cvFullPath = !empty($cvPath) ? PUBLIC_PATH . $cvPath : '';
 $cvFileName = !empty($cvPath) ? basename($cvPath) : '';
 $cvUploadedAt = (!empty($cvFullPath) && file_exists($cvFullPath)) ? date('d/m/Y', filemtime($cvFullPath)) : null;
+$cvAdminComment = trim((string) ($estudiante['comentario_cv_admin'] ?? ''));
+$cvReviewDate = '';
+if (!empty($estudiante['fecha_revision_cv'])) {
+    $cvReviewTimestamp = strtotime((string) $estudiante['fecha_revision_cv']);
+    if ($cvReviewTimestamp !== false) {
+        $cvReviewDate = date('d/m/Y h:i A', $cvReviewTimestamp);
+    }
+}
 $canvaResumeUrl = 'https://www.canva.com/create/resumes/';
 
 // Obtener conteo de empresas del área del estudiante
@@ -270,6 +278,18 @@ $evaluaciones_stats = Database::selectOne("
             </ul>
         </div>
         <?php endif; ?>
+
+        <?php if ($cvAdminComment !== ''): ?>
+        <div class="cv-feedback-box">
+            <div class="cv-feedback-title">
+                <i class="fas fa-comment-dots"></i> Comentario del centro
+            </div>
+            <p><?php echo nl2br(htmlspecialchars($cvAdminComment), false); ?></p>
+            <?php if ($cvReviewDate !== ''): ?>
+            <div class="cv-feedback-date">Revision registrada el <?php echo htmlspecialchars($cvReviewDate); ?>.</div>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
     </div>
     <div class="card-actions cv-card-actions">
         <?php if ($tiene_cv): ?>
@@ -361,6 +381,45 @@ $evaluaciones_stats = Database::selectOne("
                         <a href="https://www.canva.com/s/templates?query=curriculum" target="_blank" rel="noopener noreferrer" class="card-btn builder-primary-btn">
                             <i class="fas fa-pen-ruler"></i> Crear en Canva
                         </a>
+                        <button type="button" class="builder-tips-link" id="openCvTips">
+                            Consejos para un CV
+                        </button>
+                    </div>
+                </div>
+
+                <div class="cv-tips-modal" id="cvTipsModal" aria-hidden="true">
+                    <div class="cv-tips-backdrop" data-close-cv-tips></div>
+                    <div class="cv-tips-dialog" role="dialog" aria-modal="true" aria-labelledby="cvTipsTitle">
+                        <button type="button" class="cv-tips-close" data-close-cv-tips aria-label="Cerrar ventana">
+                            <i class="fas fa-times"></i>
+                        </button>
+                        <div class="cv-tips-header">
+                            <span class="cv-tips-kicker">Guia rapida</span>
+                            <h3 id="cvTipsTitle">Consejos para un CV efectivo</h3>
+                            <p>Usa esta estructura para que tu perfil tecnico se vea claro y profesional.</p>
+                        </div>
+                        <ul class="cv-tips-list">
+                            <li>
+                                <strong>Datos claros al inicio</strong>
+                                Incluye nombre completo, telefono, correo y enlace a portafolio si tienes.
+                            </li>
+                            <li>
+                                <strong>Objetivo profesional corto</strong>
+                                Escribe 2 o 3 lineas con tu area tecnica y el tipo de pasantia que buscas.
+                            </li>
+                            <li>
+                                <strong>Habilidades tecnicas reales</strong>
+                                Enumera herramientas y tecnologias que ya manejas, evitando exagerar.
+                            </li>
+                            <li>
+                                <strong>Proyectos o practicas</strong>
+                                Describe brevemente lo que hiciste, con resultados o aportes concretos.
+                            </li>
+                            <li>
+                                <strong>Cuida formato y ortografia</strong>
+                                Mantelo en una pagina, con tipografia limpia y sin errores de redaccion.
+                            </li>
+                        </ul>
                     </div>
                 </div>
 
@@ -540,6 +599,41 @@ deleteCVButton?.addEventListener('click', function() {
         btn.disabled = false;
     });
 });
+
+        const cvTipsModal = document.getElementById('cvTipsModal');
+        const openCvTipsButton = document.getElementById('openCvTips');
+        const closeCvTipsTriggers = document.querySelectorAll('[data-close-cv-tips]');
+
+        function openCvTipsModal() {
+            if (!cvTipsModal) {
+                return;
+            }
+
+            cvTipsModal.classList.add('active');
+            cvTipsModal.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('modal-open');
+        }
+
+        function closeCvTipsModal() {
+            if (!cvTipsModal) {
+                return;
+            }
+
+            cvTipsModal.classList.remove('active');
+            cvTipsModal.setAttribute('aria-hidden', 'true');
+            document.body.classList.remove('modal-open');
+        }
+
+        openCvTipsButton?.addEventListener('click', openCvTipsModal);
+        closeCvTipsTriggers.forEach(function(trigger) {
+            trigger.addEventListener('click', closeCvTipsModal);
+        });
+
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape' && cvTipsModal?.classList.contains('active')) {
+                closeCvTipsModal();
+            }
+        });
 
         document.addEventListener('click', function(event) {
             const sidebar = document.querySelector('.sidebar');

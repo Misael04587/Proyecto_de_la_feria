@@ -415,6 +415,59 @@
     line-height: 1.5;
 }
 
+.cv-inline-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 10px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #2b6cb0;
+    text-decoration: none;
+}
+
+.cv-inline-link:hover {
+    text-decoration: underline;
+}
+
+.cv-review-form {
+    display: grid;
+    gap: 8px;
+    min-width: 280px;
+}
+
+.cv-review-textarea {
+    resize: vertical;
+    min-height: 84px;
+    border: 1px solid rgba(66, 153, 225, 0.22);
+    border-radius: 12px;
+    padding: 10px 12px;
+    color: var(--dark);
+    font-size: 13px;
+    line-height: 1.45;
+    outline: none;
+}
+
+.cv-review-textarea:focus {
+    border-color: rgba(66, 153, 225, 0.55);
+    box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.12);
+}
+
+.cv-review-submit {
+    border: 0;
+    border-radius: 10px;
+    background: #1a365d;
+    color: var(--white);
+    font-size: 12px;
+    font-weight: 700;
+    padding: 10px 12px;
+    cursor: pointer;
+}
+
+.cv-review-submit:hover {
+    background: #2b6cb0;
+}
+
 .compact-list {
     display: grid;
     gap: 14px;
