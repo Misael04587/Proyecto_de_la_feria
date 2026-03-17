@@ -468,6 +468,34 @@
     background: #2b6cb0;
 }
 
+.student-actions-cell {
+    min-width: 140px;
+}
+
+.student-delete-form {
+    margin: 0;
+}
+
+.student-delete-btn {
+    border: 1px solid rgba(245, 101, 101, 0.28);
+    border-radius: 10px;
+    background: #fff5f5;
+    color: #c53030;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 10px 12px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: 0.2s ease;
+}
+
+.student-delete-btn:hover {
+    background: #f56565;
+    color: #ffffff;
+}
+
 .compact-list {
     display: grid;
     gap: 14px;

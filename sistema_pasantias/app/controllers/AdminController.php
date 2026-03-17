@@ -101,7 +101,7 @@ class AdminController {
         $centerId = (int) $context['centro']['id'];
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $this->handleStudentCvReview($centerId);
+            $this->handleStudentManagementAction($centerId);
         }
 
         $filters = [
@@ -539,12 +539,16 @@ class AdminController {
         }
     }
 
-    private function handleStudentCvReview($centerId) {
+    private function handleStudentManagementAction($centerId) {
         if (!Security::validateCSRFToken($_POST['csrf_token'] ?? '')) {
             redirect('admin-students', 'Token de seguridad invalido', 'error');
         }
 
         $intent = trim((string) ($_POST['intent'] ?? ''));
+        if ($intent === 'delete_student') {
+            $this->deleteStudentCompletely($centerId);
+        }
+
         if ($intent !== 'save_cv_comment') {
             redirect('admin-students', 'Accion de revision no reconocida', 'warning');
         }
@@ -605,6 +609,104 @@ class AdminController {
         }
 
         redirect('admin-students', 'Comentario del CV guardado correctamente', 'success');
+    }
+
+    private function deleteStudentCompletely($centerId) {
+        $studentId = (int) ($_POST['student_id'] ?? 0);
+        if ($studentId <= 0) {
+            redirect('admin-students', 'Selecciona un estudiante valido para eliminar', 'error');
+        }
+
+        $student = Database::selectOne("
+            SELECT id, usuario_id, cv_path, foto_perfil
+            FROM estudiantes
+            WHERE id = ? AND centro_id = ?
+            LIMIT 1
+        ", [$studentId, $centerId]);
+
+        if (!$student) {
+            redirect('admin-students', 'No se encontro el estudiante seleccionado', 'error');
+        }
+
+        Database::beginTransaction();
+
+        try {
+            $questionsDeleted = Database::execute("
+                DELETE ep
+                FROM evaluacion_preguntas ep
+                INNER JOIN evaluaciones ev ON ev.id = ep.evaluacion_id
+                WHERE ev.estudiante_id = ?
+            ", [$studentId]);
+            if ($questionsDeleted === false) {
+                throw new RuntimeException('No se pudo limpiar el detalle de evaluaciones');
+            }
+
+            $logsDeleted = Database::execute("
+                DELETE ls
+                FROM logs_seguridad ls
+                INNER JOIN evaluaciones ev ON ev.id = ls.evaluacion_id
+                WHERE ev.estudiante_id = ?
+            ", [$studentId]);
+            if ($logsDeleted === false) {
+                throw new RuntimeException('No se pudo limpiar el historial de seguridad');
+            }
+
+            $assignmentsDeleted = Database::execute("
+                DELETE FROM asignaciones
+                WHERE estudiante_id = ?
+            ", [$studentId]);
+            if ($assignmentsDeleted === false) {
+                throw new RuntimeException('No se pudo eliminar las pasantias del estudiante');
+            }
+
+            $evaluationsDeleted = Database::execute("
+                DELETE FROM evaluaciones
+                WHERE estudiante_id = ?
+            ", [$studentId]);
+            if ($evaluationsDeleted === false) {
+                throw new RuntimeException('No se pudo eliminar las evaluaciones del estudiante');
+            }
+
+            $studentDeleted = Database::execute("
+                DELETE FROM estudiantes
+                WHERE id = ? AND centro_id = ?
+            ", [$studentId, $centerId]);
+
+            if (!$studentDeleted) {
+                throw new RuntimeException('No se pudo eliminar el registro del estudiante');
+            }
+
+            $userDeleted = Database::execute("
+                DELETE FROM usuarios
+                WHERE id = ?
+            ", [(int) $student['usuario_id']]);
+
+            if (!$userDeleted) {
+                throw new RuntimeException('No se pudo eliminar la cuenta del usuario');
+            }
+
+            Database::commit();
+        } catch (Throwable $exception) {
+            Database::rollback();
+            redirect('admin-students', 'No se pudo eliminar el estudiante: ' . $exception->getMessage(), 'error');
+        }
+
+        $this->deleteStudentFile($student['cv_path'] ?? '');
+        $this->deleteStudentFile($student['foto_perfil'] ?? '');
+
+        redirect('admin-students', 'Estudiante eliminado completamente del sistema', 'success');
+    }
+
+    private function deleteStudentFile($storedPath) {
+        $storedPath = ltrim(str_replace('\\', '/', (string) $storedPath), '/');
+        if ($storedPath === '') {
+            return;
+        }
+
+        $fullPath = PUBLIC_PATH . $storedPath;
+        if (file_exists($fullPath)) {
+            @unlink($fullPath);
+        }
     }
 
     private function guardAccess() {

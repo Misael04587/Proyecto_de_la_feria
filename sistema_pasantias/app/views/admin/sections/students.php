@@ -84,6 +84,7 @@ $studentsWithoutCv = max($studentsTotal - $studentsWithCv, 0);
                     <th>Revision CV</th>
                     <th>Ultima evaluacion</th>
                     <th>Pasantia</th>
+                    <th>Acciones</th>
                 </tr>
             </thead>
             <tbody>
@@ -158,6 +159,20 @@ $studentsWithoutCv = max($studentsTotal - $studentsWithCv, 0);
                         <?php else: ?>
                         <span class="pill pill-neutral">Sin pasantia</span>
                         <?php endif; ?>
+                    </td>
+                    <td class="student-actions-cell">
+                        <form
+                            method="POST"
+                            action="index.php?page=admin-students"
+                            class="student-delete-form"
+                            onsubmit="return confirm('Esta accion eliminara al estudiante, su usuario, CV, evaluaciones y pasantias. ¿Deseas continuar?');">
+                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken ?? ''); ?>">
+                            <input type="hidden" name="intent" value="delete_student">
+                            <input type="hidden" name="student_id" value="<?php echo (int) ($student['id'] ?? 0); ?>">
+                            <button type="submit" class="student-delete-btn">
+                                <i class="fas fa-trash"></i> Eliminar
+                            </button>
+                        </form>
                     </td>
                 </tr>
                 <?php endforeach; ?>
