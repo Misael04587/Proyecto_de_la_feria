@@ -62,6 +62,22 @@ $studentsWithoutCv = max($studentsTotal - $studentsWithCv, 0);
         </div>
         <button type="submit" class="card-btn" style="width:auto;padding:14px 20px;"><i class="fas fa-filter"></i> Filtrar</button>
         <a href="index.php?page=admin-students" class="secondary-inline-btn" style="width:auto;padding:14px 20px;"><i class="fas fa-rotate-left"></i> Limpiar</a>
+        <button
+            type="submit"
+            form="delete-all-students-form"
+            class="student-delete-all-btn"
+            style="width:auto;padding:14px 20px;">
+            <i class="fas fa-trash"></i> Eliminar todos
+        </button>
+    </form>
+    <form
+        method="POST"
+        action="index.php?page=admin-students"
+        id="delete-all-students-form"
+        class="student-bulk-delete-form"
+        onsubmit="return confirm('Esta accion eliminara a todos los estudiantes del centro, junto con sus usuarios, CV, evaluaciones y pasantias. Deseas continuar?');">
+        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken ?? ''); ?>">
+        <input type="hidden" name="intent" value="delete_all_students">
     </form>
 </section>
 

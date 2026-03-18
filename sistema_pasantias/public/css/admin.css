@@ -476,6 +476,10 @@
     margin: 0;
 }
 
+.student-bulk-delete-form {
+    display: none;
+}
+
 .student-delete-btn {
     border: 1px solid rgba(245, 101, 101, 0.28);
     border-radius: 10px;
@@ -494,6 +498,26 @@
 .student-delete-btn:hover {
     background: #f56565;
     color: #ffffff;
+}
+
+.student-delete-all-btn {
+    border: 1px solid rgba(245, 101, 101, 0.22);
+    border-radius: 12px;
+    background: linear-gradient(135deg, #f56565, #e53e3e);
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: 0.2s ease;
+    box-shadow: 0 10px 22px rgba(229, 62, 62, 0.22);
+}
+
+.student-delete-all-btn:hover {
+    background: linear-gradient(135deg, #e53e3e, #c53030);
+    box-shadow: 0 12px 24px rgba(197, 48, 48, 0.28);
 }
 
 .compact-list {

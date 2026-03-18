@@ -548,6 +548,9 @@ class AdminController {
         if ($intent === 'delete_student') {
             $this->deleteStudentCompletely($centerId);
         }
+        if ($intent === 'delete_all_students') {
+            $this->deleteAllStudentsCompletely($centerId);
+        }
 
         if ($intent !== 'save_cv_comment') {
             redirect('admin-students', 'Accion de revision no reconocida', 'warning');
@@ -618,15 +621,84 @@ class AdminController {
         }
 
         $student = Database::selectOne("
-            SELECT id, usuario_id, cv_path, foto_perfil
-            FROM estudiantes
-            WHERE id = ? AND centro_id = ?
+            SELECT e.id, e.usuario_id, e.cv_path, e.foto_perfil, u.correo
+            FROM estudiantes e
+            INNER JOIN usuarios u ON u.id = e.usuario_id
+            WHERE e.id = ? AND e.centro_id = ?
             LIMIT 1
         ", [$studentId, $centerId]);
 
         if (!$student) {
             redirect('admin-students', 'No se encontro el estudiante seleccionado', 'error');
         }
+
+        try {
+            $this->purgeStudentsFromCenter([$student], $centerId);
+        } catch (Throwable $exception) {
+            redirect('admin-students', 'No se pudo eliminar el estudiante: ' . $exception->getMessage(), 'error');
+        }
+
+        redirect('admin-students', 'Estudiante eliminado completamente del sistema', 'success');
+    }
+
+    private function deleteAllStudentsCompletely($centerId) {
+        $students = Database::select("
+            SELECT e.id, e.usuario_id, e.cv_path, e.foto_perfil, u.correo
+            FROM estudiantes e
+            INNER JOIN usuarios u ON u.id = e.usuario_id
+            WHERE e.centro_id = ?
+            ORDER BY e.id ASC
+        ", [$centerId]);
+
+        if (empty($students)) {
+            redirect('admin-students', 'No hay estudiantes para eliminar en este centro', 'info');
+        }
+
+        try {
+            $deletedCount = $this->purgeStudentsFromCenter($students, $centerId);
+        } catch (Throwable $exception) {
+            redirect('admin-students', 'No se pudo eliminar la lista completa: ' . $exception->getMessage(), 'error');
+        }
+
+        $message = $deletedCount === 1
+            ? 'Se elimino 1 estudiante del centro'
+            : 'Se eliminaron ' . $deletedCount . ' estudiantes del centro';
+
+        redirect('admin-students', $message, 'success');
+    }
+
+    private function purgeStudentsFromCenter(array $students, $centerId) {
+        $studentIds = [];
+        $userIds = [];
+        $logDetails = [];
+
+        foreach ($students as $student) {
+            $studentId = (int) ($student['id'] ?? 0);
+            $userId = (int) ($student['usuario_id'] ?? 0);
+            $email = trim((string) ($student['correo'] ?? ''));
+
+            if ($studentId > 0) {
+                $studentIds[] = $studentId;
+            }
+            if ($userId > 0) {
+                $userIds[] = $userId;
+                $logDetails[] = 'Usuario ' . $userId . ' cerro sesion';
+            }
+            if ($email !== '') {
+                $logDetails[] = 'Intento fallido para: ' . $email;
+            }
+        }
+
+        $studentIds = array_values(array_unique($studentIds));
+        $userIds = array_values(array_unique($userIds));
+        $logDetails = array_values(array_unique($logDetails));
+
+        if (empty($studentIds) || empty($userIds)) {
+            throw new RuntimeException('No se encontraron ids validos para ejecutar la limpieza');
+        }
+
+        $studentPlaceholders = $this->buildPlaceholders(count($studentIds));
+        $userPlaceholders = $this->buildPlaceholders(count($userIds));
 
         Database::beginTransaction();
 
@@ -635,8 +707,8 @@ class AdminController {
                 DELETE ep
                 FROM evaluacion_preguntas ep
                 INNER JOIN evaluaciones ev ON ev.id = ep.evaluacion_id
-                WHERE ev.estudiante_id = ?
-            ", [$studentId]);
+                WHERE ev.estudiante_id IN ($studentPlaceholders)
+            ", $studentIds);
             if ($questionsDeleted === false) {
                 throw new RuntimeException('No se pudo limpiar el detalle de evaluaciones');
             }
@@ -645,56 +717,96 @@ class AdminController {
                 DELETE ls
                 FROM logs_seguridad ls
                 INNER JOIN evaluaciones ev ON ev.id = ls.evaluacion_id
-                WHERE ev.estudiante_id = ?
-            ", [$studentId]);
+                WHERE ev.estudiante_id IN ($studentPlaceholders)
+            ", $studentIds);
             if ($logsDeleted === false) {
                 throw new RuntimeException('No se pudo limpiar el historial de seguridad');
             }
 
+            if (!empty($logDetails)) {
+                $logPlaceholders = $this->buildPlaceholders(count($logDetails));
+                $genericLogsDeleted = Database::execute("
+                    DELETE FROM logs_seguridad
+                    WHERE detalles IN ($logPlaceholders)
+                ", $logDetails);
+                if ($genericLogsDeleted === false) {
+                    throw new RuntimeException('No se pudo limpiar los logs generales del estudiante');
+                }
+            }
+
             $assignmentsDeleted = Database::execute("
                 DELETE FROM asignaciones
-                WHERE estudiante_id = ?
-            ", [$studentId]);
+                WHERE estudiante_id IN ($studentPlaceholders)
+            ", $studentIds);
             if ($assignmentsDeleted === false) {
-                throw new RuntimeException('No se pudo eliminar las pasantias del estudiante');
+                throw new RuntimeException('No se pudo eliminar las pasantias de los estudiantes');
             }
 
             $evaluationsDeleted = Database::execute("
                 DELETE FROM evaluaciones
-                WHERE estudiante_id = ?
-            ", [$studentId]);
+                WHERE estudiante_id IN ($studentPlaceholders)
+            ", $studentIds);
             if ($evaluationsDeleted === false) {
-                throw new RuntimeException('No se pudo eliminar las evaluaciones del estudiante');
+                throw new RuntimeException('No se pudo eliminar las evaluaciones de los estudiantes');
             }
 
+            $studentParams = array_merge([(int) $centerId], $studentIds);
             $studentDeleted = Database::execute("
                 DELETE FROM estudiantes
-                WHERE id = ? AND centro_id = ?
-            ", [$studentId, $centerId]);
-
-            if (!$studentDeleted) {
-                throw new RuntimeException('No se pudo eliminar el registro del estudiante');
+                WHERE centro_id = ? AND id IN ($studentPlaceholders)
+            ", $studentParams);
+            if ($studentDeleted === false) {
+                throw new RuntimeException('No se pudo eliminar el registro de estudiantes');
             }
 
+            $remainingStudents = Database::selectOne("
+                SELECT COUNT(*) AS total
+                FROM estudiantes
+                WHERE centro_id = ? AND id IN ($studentPlaceholders)
+            ", $studentParams);
+            if ((int) ($remainingStudents['total'] ?? 0) > 0) {
+                throw new RuntimeException('Quedaron estudiantes pendientes por eliminar');
+            }
+
+            $userParams = array_merge([(int) $centerId], $userIds);
             $userDeleted = Database::execute("
                 DELETE FROM usuarios
-                WHERE id = ?
-            ", [(int) $student['usuario_id']]);
+                WHERE centro_id = ? AND id IN ($userPlaceholders)
+            ", $userParams);
+            if ($userDeleted === false) {
+                throw new RuntimeException('No se pudo eliminar las cuentas de usuario asociadas');
+            }
 
-            if (!$userDeleted) {
-                throw new RuntimeException('No se pudo eliminar la cuenta del usuario');
+            $remainingUsers = Database::selectOne("
+                SELECT COUNT(*) AS total
+                FROM usuarios
+                WHERE centro_id = ? AND id IN ($userPlaceholders)
+            ", $userParams);
+            if ((int) ($remainingUsers['total'] ?? 0) > 0) {
+                throw new RuntimeException('Quedaron usuarios pendientes por eliminar');
             }
 
             Database::commit();
         } catch (Throwable $exception) {
             Database::rollback();
-            redirect('admin-students', 'No se pudo eliminar el estudiante: ' . $exception->getMessage(), 'error');
+            throw $exception;
         }
 
-        $this->deleteStudentFile($student['cv_path'] ?? '');
-        $this->deleteStudentFile($student['foto_perfil'] ?? '');
+        foreach ($students as $student) {
+            $this->deleteStudentFile($student['cv_path'] ?? '');
+            $this->deleteStudentFile($student['foto_perfil'] ?? '');
+        }
 
-        redirect('admin-students', 'Estudiante eliminado completamente del sistema', 'success');
+        return count($studentIds);
+    }
+
+    private function buildPlaceholders($count) {
+        $count = (int) $count;
+        if ($count <= 0) {
+            throw new RuntimeException('Cantidad de placeholders invalida');
+        }
+
+        return implode(', ', array_fill(0, $count, '?'));
     }
 
     private function deleteStudentFile($storedPath) {
