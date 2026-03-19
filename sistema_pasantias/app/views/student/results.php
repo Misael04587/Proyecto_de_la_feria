@@ -72,7 +72,21 @@ $getPostulationMeta = function ($evaluacion) {
     }
 
     if ($estado === 'aprobado') {
-        return ['label' => 'Aprobaste el examen y quedaste pendiente de asignacion', 'class' => 'post-info', 'icon' => 'fa-star'];
+        $seguimiento = (string) ($evaluacion['seguimiento_estado'] ?? 'sin_revisar');
+
+        if ($seguimiento === 'preseleccionado') {
+            return ['label' => 'Aprobaste y quedaste preseleccionado', 'class' => 'post-aprobada', 'icon' => 'fa-award'];
+        }
+
+        if ($seguimiento === 'en_revision') {
+            return ['label' => 'Aprobaste y tu expediente esta en revision', 'class' => 'post-pendiente', 'icon' => 'fa-hourglass-half'];
+        }
+
+        if ($seguimiento === 'descartado') {
+            return ['label' => 'Aprobaste el examen, pero coordinacion descarto la postulacion', 'class' => 'post-anulada', 'icon' => 'fa-ban'];
+        }
+
+        return ['label' => 'Aprobaste el examen y quedaste pendiente de revision', 'class' => 'post-info', 'icon' => 'fa-star'];
     }
 
     if ($estado === 'anulado') {
@@ -786,6 +800,9 @@ if ($evaluacionDetalle) {
                                     La asignacion quedo registrada el <?php echo htmlspecialchars($formatDate($evaluacionDetalle['fecha_asignacion'], false)); ?>.
                                 <?php elseif (($evaluacionDetalle['estado'] ?? '') === 'aprobado'): ?>
                                     Tu aprobacion quedo lista y ahora el centro debe revisar si te asigna a esta empresa.
+                                    <?php if (!empty($evaluacionDetalle['seguimiento_comentario'])): ?>
+                                        Comentario del coordinador: <?php echo htmlspecialchars($evaluacionDetalle['seguimiento_comentario']); ?>.
+                                    <?php endif; ?>
                                 <?php elseif (($evaluacionDetalle['estado'] ?? '') === 'reprobado'): ?>
                                     Necesitas mejorar el examen para avanzar a la empresa.
                                 <?php elseif (($evaluacionDetalle['estado'] ?? '') === 'pendiente'): ?>

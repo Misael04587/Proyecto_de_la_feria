@@ -14,6 +14,12 @@ $formatDate = function ($value, $withTime = true) {
 
     return date($withTime ? 'd/m/Y h:i A' : 'd/m/Y', $timestamp);
 };
+$followUpMeta = [
+    'sin_revisar' => ['label' => 'Pendiente de revision', 'class' => 'pill-orange'],
+    'en_revision' => ['label' => 'En revision', 'class' => 'pill-blue'],
+    'preseleccionado' => ['label' => 'Preseleccionado', 'class' => 'pill-green'],
+    'descartado' => ['label' => 'Descartado', 'class' => 'pill-red'],
+];
 ?>
 <section class="summary-strip">
     <article class="summary-card">
@@ -124,6 +130,8 @@ $formatDate = function ($value, $withTime = true) {
                     : ($evaluationState === 'pendiente'
                         ? 'pill-orange'
                         : ($evaluationState === 'reprobado' ? 'pill-red' : 'pill-neutral'));
+                $followUpState = (string) ($student['ultima_evaluacion_seguimiento_estado'] ?? '');
+                $followUpItem = $followUpMeta[$followUpState] ?? null;
 
                 $reviewDateLabel = 'Sin revision';
                 if (!empty($student['fecha_revision_cv'])) {
@@ -163,7 +171,6 @@ $formatDate = function ($value, $withTime = true) {
                                 class="cv-review-textarea"
                                 placeholder="Ejemplo: corrige el formato, agrega experiencia tecnica o mejora la presentacion."><?php echo htmlspecialchars((string) ($student['comentario_cv_admin'] ?? '')); ?></textarea>
                             <div class="muted-line">Ultima revision: <?php echo htmlspecialchars($reviewDateLabel); ?></div>
-                            <div class="muted-line">Si lo dejas vacio y guardas, se elimina el comentario.</div>
                             <button type="submit" class="cv-review-submit">
                                 <i class="fas fa-floppy-disk"></i> Guardar comentario
                             </button>
@@ -176,6 +183,11 @@ $formatDate = function ($value, $withTime = true) {
                         <?php if ($evaluationState !== ''): ?>
                         <span class="pill <?php echo $evaluationPill; ?>"><?php echo htmlspecialchars(ucfirst($evaluationState)); ?></span>
                         <div class="muted-line">Nota: <?php echo $student['ultima_evaluacion_nota'] !== null ? htmlspecialchars(number_format((float) $student['ultima_evaluacion_nota'], 1)) : 'Sin nota'; ?></div>
+                        <?php if ($evaluationState === 'aprobado' && $followUpItem): ?>
+                        <span class="pill <?php echo htmlspecialchars($followUpItem['class']); ?>" style="margin-top: 8px;">
+                            <?php echo htmlspecialchars($followUpItem['label']); ?>
+                        </span>
+                        <?php endif; ?>
                         <?php else: ?>
                         <span class="pill pill-neutral">Sin evaluacion</span>
                         <?php endif; ?>
@@ -218,6 +230,9 @@ $formatDate = function ($value, $withTime = true) {
                         <?php endif; ?>
                     </td>
                     <td class="student-actions-cell">
+                        <a href="index.php?page=admin-students&history=<?php echo (int) ($student['id'] ?? 0); ?>" class="company-edit-btn" style="margin-bottom: 10px;">
+                            <i class="fas fa-clock-rotate-left"></i> Historial
+                        </a>
                         <form
                             method="POST"
                             action="index.php?page=admin-students"
@@ -240,3 +255,82 @@ $formatDate = function ($value, $withTime = true) {
     <div class="empty-state">No hay estudiantes que coincidan con el filtro actual.</div>
     <?php endif; ?>
 </section>
+
+<?php if (!empty($selectedStudentHistory)): ?>
+<section class="table-card">
+    <div class="table-card-header">
+        <div>
+            <h2 class="section-title">Historial del estudiante</h2>
+            <p class="section-copy">
+                <?php echo htmlspecialchars($selectedStudentHistory['nombre'] ?? 'Estudiante'); ?>
+                - <?php echo htmlspecialchars($selectedStudentHistory['matricula'] ?? 'Sin matricula'); ?>
+            </p>
+        </div>
+        <a href="index.php?page=admin-students" class="secondary-inline-btn" style="width:auto;padding:12px 18px;">
+            <i class="fas fa-xmark"></i> Cerrar historial
+        </a>
+    </div>
+    <?php if (!empty($studentHistoryRows)): ?>
+    <div class="table-scroll">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Empresa</th>
+                    <th>Examen</th>
+                    <th>Seguimiento</th>
+                    <th>Pasantia</th>
+                    <th>Fecha</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($studentHistoryRows as $historyRow): ?>
+                <?php
+                $historyFollowUp = $followUpMeta[$historyRow['seguimiento_estado'] ?? ''] ?? ['label' => 'Sin seguimiento', 'class' => 'pill-neutral'];
+                $historyExamClass = ($historyRow['estado'] ?? '') === 'aprobado'
+                    ? 'pill-green'
+                    : ((($historyRow['estado'] ?? '') === 'pendiente')
+                        ? 'pill-orange'
+                        : ((($historyRow['estado'] ?? '') === 'reprobado') ? 'pill-red' : 'pill-neutral'));
+                ?>
+                <tr>
+                    <td>
+                        <strong><?php echo htmlspecialchars($historyRow['empresa_nombre'] ?? 'Empresa'); ?></strong>
+                        <div class="muted-line"><?php echo htmlspecialchars($historyRow['empresa_area'] ?? 'Sin area'); ?></div>
+                    </td>
+                    <td>
+                        <span class="pill <?php echo $historyExamClass; ?>"><?php echo htmlspecialchars(ucfirst((string) ($historyRow['estado'] ?? 'sin estado'))); ?></span>
+                        <div class="muted-line">Nota: <?php echo $historyRow['nota'] !== null ? htmlspecialchars(number_format((float) $historyRow['nota'], 1)) : 'Sin nota'; ?></div>
+                    </td>
+                    <td>
+                        <?php if (($historyRow['estado'] ?? '') === 'aprobado'): ?>
+                        <span class="pill <?php echo htmlspecialchars($historyFollowUp['class']); ?>"><?php echo htmlspecialchars($historyFollowUp['label']); ?></span>
+                        <?php if (!empty($historyRow['seguimiento_comentario'])): ?>
+                        <div class="muted-line"><?php echo htmlspecialchars($historyRow['seguimiento_comentario']); ?></div>
+                        <?php endif; ?>
+                        <?php else: ?>
+                        <span class="pill pill-neutral">No aplica</span>
+                        <?php endif; ?>
+                    </td>
+                    <td>
+                        <?php if (!empty($historyRow['asignacion_estado'])): ?>
+                        <span class="pill <?php echo ($historyRow['asignacion_estado'] ?? '') === 'activa' ? 'pill-blue' : (($historyRow['asignacion_estado'] ?? '') === 'finalizada' ? 'pill-green' : 'pill-red'); ?>">
+                            <?php echo htmlspecialchars(ucfirst((string) ($historyRow['asignacion_estado'] ?? ''))); ?>
+                        </span>
+                        <?php if (!empty($historyRow['fecha_asignacion'])): ?>
+                        <div class="muted-line">Desde <?php echo htmlspecialchars($formatDate($historyRow['fecha_asignacion'], false)); ?></div>
+                        <?php endif; ?>
+                        <?php else: ?>
+                        <span class="pill pill-neutral">Sin pasantia</span>
+                        <?php endif; ?>
+                    </td>
+                    <td><?php echo htmlspecialchars($formatDate($historyRow['fecha_evaluacion'] ?? null, true)); ?></td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+    <?php else: ?>
+    <div class="empty-state">Este estudiante aun no tiene evaluaciones registradas.</div>
+    <?php endif; ?>
+</section>
+<?php endif; ?>

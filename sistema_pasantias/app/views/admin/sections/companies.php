@@ -3,6 +3,18 @@ $totalCompanies = (int) ($stats['empresas'] ?? 0);
 $totalSlots = (int) ($stats['cupos_totales'] ?? 0);
 $activeAssignments = (int) ($stats['asignaciones_activas'] ?? 0);
 $freeSlots = max($totalSlots - $activeAssignments, 0);
+$formatDate = function ($value, $withTime = true) {
+    if (empty($value)) {
+        return 'Sin registrar';
+    }
+
+    $timestamp = strtotime((string) $value);
+    if ($timestamp === false) {
+        return 'Sin registrar';
+    }
+
+    return date($withTime ? 'd/m/Y h:i A' : 'd/m/Y', $timestamp);
+};
 
 $companyFormData = is_array($companyFormData ?? null) ? $companyFormData : [];
 $companyFormData = array_merge([
@@ -23,6 +35,12 @@ $formCopy = $isEditingCompany
     : 'Crea una empresa nueva para que pueda recibir postulaciones del centro.';
 $formIntent = $isEditingCompany ? 'update_company' : 'create_company';
 $formSubmitLabel = $isEditingCompany ? 'Guardar cambios' : 'Registrar empresa';
+$followUpMeta = [
+    'sin_revisar' => ['label' => 'Pendiente de revision', 'class' => 'pill-orange'],
+    'en_revision' => ['label' => 'En revision', 'class' => 'pill-blue'],
+    'preseleccionado' => ['label' => 'Preseleccionado', 'class' => 'pill-green'],
+    'descartado' => ['label' => 'Descartado', 'class' => 'pill-red'],
+];
 ?>
 <section class="summary-strip">
     <article class="summary-card">
@@ -310,6 +328,10 @@ $formSubmitLabel = $isEditingCompany ? 'Guardar cambios' : 'Registrar empresa';
                                 <i class="fas fa-pen"></i>
                                 Editar
                             </a>
+                            <a href="index.php?page=admin-companies&history=<?php echo (int) ($company['id'] ?? 0); ?>" class="company-edit-btn">
+                                <i class="fas fa-clock-rotate-left"></i>
+                                Historial
+                            </a>
                             <form
                                 method="POST"
                                 action="index.php?page=admin-companies"
@@ -337,3 +359,81 @@ $formSubmitLabel = $isEditingCompany ? 'Guardar cambios' : 'Registrar empresa';
     <div class="empty-state">No hay empresas que coincidan con el filtro aplicado.</div>
     <?php endif; ?>
 </section>
+
+<?php if (!empty($selectedCompanyHistory)): ?>
+<section class="table-card">
+    <div class="table-card-header">
+        <div>
+            <h2 class="section-title">Historial de la empresa</h2>
+            <p class="section-copy"><?php echo htmlspecialchars($selectedCompanyHistory['nombre'] ?? 'Empresa'); ?> - <?php echo htmlspecialchars($selectedCompanyHistory['area_tecnica'] ?? 'Sin area'); ?></p>
+        </div>
+        <a href="index.php?page=admin-companies" class="company-secondary-btn">
+            <i class="fas fa-xmark"></i>
+            Cerrar historial
+        </a>
+    </div>
+    <?php if (!empty($companyHistoryRows)): ?>
+    <div class="table-scroll">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Estudiante</th>
+                    <th>Examen</th>
+                    <th>Seguimiento</th>
+                    <th>Pasantia</th>
+                    <th>Fecha</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($companyHistoryRows as $historyRow): ?>
+                <?php
+                $historyFollowUp = $followUpMeta[$historyRow['seguimiento_estado'] ?? ''] ?? ['label' => 'Sin seguimiento', 'class' => 'pill-neutral'];
+                $historyExamClass = ($historyRow['estado'] ?? '') === 'aprobado'
+                    ? 'pill-green'
+                    : ((($historyRow['estado'] ?? '') === 'pendiente')
+                        ? 'pill-orange'
+                        : ((($historyRow['estado'] ?? '') === 'reprobado') ? 'pill-red' : 'pill-neutral'));
+                ?>
+                <tr>
+                    <td>
+                        <strong><?php echo htmlspecialchars($historyRow['estudiante_nombre'] ?? 'Sin estudiante'); ?></strong>
+                        <div class="muted-line"><?php echo htmlspecialchars($historyRow['matricula'] ?? 'Sin matricula'); ?></div>
+                        <div class="muted-line"><?php echo htmlspecialchars($historyRow['estudiante_area'] ?? 'Sin area'); ?></div>
+                    </td>
+                    <td>
+                        <span class="pill <?php echo $historyExamClass; ?>"><?php echo htmlspecialchars(ucfirst((string) ($historyRow['estado'] ?? 'sin estado'))); ?></span>
+                        <div class="muted-line">Nota: <?php echo $historyRow['nota'] !== null ? htmlspecialchars(number_format((float) $historyRow['nota'], 1)) : 'Sin nota'; ?></div>
+                    </td>
+                    <td>
+                        <?php if (($historyRow['estado'] ?? '') === 'aprobado'): ?>
+                        <span class="pill <?php echo htmlspecialchars($historyFollowUp['class']); ?>"><?php echo htmlspecialchars($historyFollowUp['label']); ?></span>
+                        <?php if (!empty($historyRow['seguimiento_comentario'])): ?>
+                        <div class="muted-line"><?php echo htmlspecialchars($historyRow['seguimiento_comentario']); ?></div>
+                        <?php endif; ?>
+                        <?php else: ?>
+                        <span class="pill pill-neutral">No aplica</span>
+                        <?php endif; ?>
+                    </td>
+                    <td>
+                        <?php if (!empty($historyRow['asignacion_estado'])): ?>
+                        <span class="pill <?php echo ($historyRow['asignacion_estado'] ?? '') === 'activa' ? 'pill-blue' : (($historyRow['asignacion_estado'] ?? '') === 'finalizada' ? 'pill-green' : 'pill-red'); ?>">
+                            <?php echo htmlspecialchars(ucfirst((string) ($historyRow['asignacion_estado'] ?? ''))); ?>
+                        </span>
+                        <?php if (!empty($historyRow['fecha_asignacion'])): ?>
+                        <div class="muted-line">Desde <?php echo htmlspecialchars($formatDate($historyRow['fecha_asignacion'], false)); ?></div>
+                        <?php endif; ?>
+                        <?php else: ?>
+                        <span class="pill pill-neutral">Sin pasantia</span>
+                        <?php endif; ?>
+                    </td>
+                    <td><?php echo htmlspecialchars($formatDate($historyRow['fecha_evaluacion'] ?? null, true)); ?></td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+    <?php else: ?>
+    <div class="empty-state">Esta empresa aun no tiene historial de evaluaciones.</div>
+    <?php endif; ?>
+</section>
+<?php endif; ?>

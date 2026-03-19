@@ -31,6 +31,7 @@ class Asignacion {
 
     public static function crearDesdeEvaluacion($evaluationId, $centerId) {
         self::ensureSchema();
+        Evaluacion::ensureWorkflowSchema();
 
         $evaluationId = (int) $evaluationId;
         $centerId = (int) $centerId;
@@ -47,6 +48,7 @@ class Asignacion {
                 SELECT
                     ev.id,
                     ev.estado,
+                    ev.seguimiento_estado,
                     ev.estudiante_id,
                     ev.empresa_id,
                     est.centro_id,
@@ -68,6 +70,10 @@ class Asignacion {
 
             if (($evaluation['estado'] ?? '') !== 'aprobado') {
                 throw new RuntimeException('Solo puedes asignar evaluaciones aprobadas');
+            }
+
+            if (($evaluation['seguimiento_estado'] ?? 'sin_revisar') !== 'preseleccionado') {
+                throw new RuntimeException('Primero debes marcar la evaluacion como preseleccionada');
             }
 
             $stmt = $pdo->prepare("

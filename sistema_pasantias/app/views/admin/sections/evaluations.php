@@ -1,3 +1,16 @@
+<?php
+$followUpOptions = is_array($followUpOptions ?? null) ? $followUpOptions : [];
+$companyOptions = is_array($companyOptions ?? null) ? $companyOptions : [];
+$followUpMeta = [
+    'sin_revisar' => ['label' => 'Pendiente de revision', 'class' => 'pill-orange'],
+    'en_revision' => ['label' => 'En revision', 'class' => 'pill-blue'],
+    'preseleccionado' => ['label' => 'Preseleccionado', 'class' => 'pill-green'],
+    'descartado' => ['label' => 'Descartado', 'class' => 'pill-red'],
+];
+$getFollowUpMeta = function ($state) use ($followUpMeta) {
+    return $followUpMeta[$state] ?? ['label' => 'Sin seguimiento', 'class' => 'pill-neutral'];
+};
+?>
 <section class="summary-strip">
     <article class="summary-card">
         <span class="summary-label">Total de evaluaciones</span>
@@ -49,6 +62,36 @@
                 <option value="anulado"<?php echo ($filters['estado'] ?? '') === 'anulado' ? ' selected' : ''; ?>>Anulado</option>
             </select>
         </div>
+        <div class="filter-group">
+            <label for="seguimiento">Seguimiento</label>
+            <select name="seguimiento" id="seguimiento">
+                <option value="">Todos</option>
+                <?php foreach ($followUpOptions as $followUpKey => $followUpLabel): ?>
+                <option value="<?php echo htmlspecialchars($followUpKey); ?>"<?php echo ($filters['seguimiento'] ?? '') === $followUpKey ? ' selected' : ''; ?>>
+                    <?php echo htmlspecialchars($followUpLabel); ?>
+                </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label for="empresa_id">Empresa</label>
+            <select name="empresa_id" id="empresa_id">
+                <option value="0">Todas</option>
+                <?php foreach ($companyOptions as $companyOption): ?>
+                <option value="<?php echo (int) ($companyOption['id'] ?? 0); ?>"<?php echo (int) ($filters['empresa_id'] ?? 0) === (int) ($companyOption['id'] ?? 0) ? ' selected' : ''; ?>>
+                    <?php echo htmlspecialchars($companyOption['nombre'] ?? 'Empresa'); ?>
+                </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label for="fecha_desde">Fecha desde</label>
+            <input type="date" name="fecha_desde" id="fecha_desde" value="<?php echo htmlspecialchars((string) ($filters['fecha_desde'] ?? '')); ?>">
+        </div>
+        <div class="filter-group">
+            <label for="fecha_hasta">Fecha hasta</label>
+            <input type="date" name="fecha_hasta" id="fecha_hasta" value="<?php echo htmlspecialchars((string) ($filters['fecha_hasta'] ?? '')); ?>">
+        </div>
         <button type="submit" class="card-btn" style="width:auto;padding:14px 20px;"><i class="fas fa-filter"></i> Filtrar</button>
         <a href="index.php?page=admin-evaluations" class="secondary-inline-btn" style="width:auto;padding:14px 20px;"><i class="fas fa-rotate-left"></i> Limpiar</a>
     </form>
@@ -84,12 +127,18 @@
                 : ($state === 'pendiente'
                     ? 'pill-orange'
                     : ($state === 'reprobado' ? 'pill-red' : 'pill-neutral'));
+            $followUpState = (string) ($evaluation['seguimiento_estado'] ?? 'sin_revisar');
+            $followUpItem = $getFollowUpMeta($followUpState);
             $hasAssignment = !empty($evaluation['asignacion_id']);
             $studentHasActiveInternship = (int) ($evaluation['estudiante_pasantias_activas'] ?? 0) > 0;
             $companySlots = (int) ($evaluation['empresa_cupos'] ?? 0);
             $companyActiveAssignments = (int) ($evaluation['empresa_asignaciones_activas'] ?? 0);
             $companyHasRoom = $companyActiveAssignments < $companySlots;
-            $canAssign = $state === 'aprobado' && !$hasAssignment && !$studentHasActiveInternship && $companyHasRoom;
+            $canAssign = $state === 'aprobado'
+                && $followUpState === 'preseleccionado'
+                && !$hasAssignment
+                && !$studentHasActiveInternship
+                && $companyHasRoom;
             ?>
             <tr>
                 <td>
@@ -109,15 +158,49 @@
                         <?php echo htmlspecialchars('Pasantia ' . $evaluation['asignacion_estado']); ?>
                     </span>
                     <?php elseif ($state === 'aprobado'): ?>
-                    <span class="pill pill-orange">Pendiente de asignacion</span>
-                    <div class="muted-line">El examen fue aprobado y espera revision del centro.</div>
+                    <span class="pill <?php echo htmlspecialchars($followUpItem['class']); ?>">
+                        <?php echo htmlspecialchars($followUpItem['label']); ?>
+                    </span>
+                    <?php if (!empty($evaluation['seguimiento_comentario'])): ?>
+                    <div class="muted-line"><?php echo htmlspecialchars($evaluation['seguimiento_comentario']); ?></div>
+                    <?php endif; ?>
+                    <?php if (!empty($evaluation['seguimiento_fecha'])): ?>
+                    <div class="muted-line">Actualizado el <?php echo htmlspecialchars($formatDate($evaluation['seguimiento_fecha'], true)); ?></div>
+                    <?php endif; ?>
                     <?php else: ?>
                     <span class="pill pill-neutral">Sin seguimiento</span>
                     <?php endif; ?>
                 </td>
                 <td class="evaluation-actions-cell">
+                    <?php if ($state === 'aprobado'): ?>
+                    <details class="evaluation-review-card">
+                        <summary class="evaluation-review-summary">
+                            <i class="fas fa-user-check"></i> Revisar candidatura
+                        </summary>
+                        <form method="POST" action="index.php?page=admin-evaluations" class="evaluation-review-form">
+                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken ?? ''); ?>">
+                            <input type="hidden" name="intent" value="save_evaluation_review">
+                            <input type="hidden" name="evaluation_id" value="<?php echo (int) ($evaluation['id'] ?? 0); ?>">
+                            <select name="seguimiento_estado" required>
+                                <?php foreach ($followUpOptions as $followUpKey => $followUpLabel): ?>
+                                <option value="<?php echo htmlspecialchars($followUpKey); ?>"<?php echo $followUpState === $followUpKey ? ' selected' : ''; ?>>
+                                    <?php echo htmlspecialchars($followUpLabel); ?>
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+                            <textarea
+                                name="seguimiento_comentario"
+                                rows="4"
+                                maxlength="2000"
+                                placeholder="Anota observaciones del coordinador sobre el proceso del estudiante."><?php echo htmlspecialchars((string) ($evaluation['seguimiento_comentario'] ?? '')); ?></textarea>
+                            <button type="submit" class="evaluation-action-btn">
+                                <i class="fas fa-floppy-disk"></i> Guardar seguimiento
+                            </button>
+                        </form>
+                    </details>
+
                     <?php if ($canAssign): ?>
-                    <form method="POST" action="index.php?page=admin-evaluations" class="evaluation-action-form">
+                    <form method="POST" action="index.php?page=admin-evaluations" class="evaluation-action-form" style="margin-top: 10px;">
                         <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken ?? ''); ?>">
                         <input type="hidden" name="intent" value="assign_evaluation">
                         <input type="hidden" name="evaluation_id" value="<?php echo (int) ($evaluation['id'] ?? 0); ?>">
@@ -125,18 +208,19 @@
                             <i class="fas fa-briefcase"></i> Asignar pasantia
                         </button>
                     </form>
-                    <?php elseif ($state === 'aprobado' && !$hasAssignment): ?>
-                    <div class="evaluation-note">
-                        <?php if ($studentHasActiveInternship): ?>
+                    <?php elseif (!$hasAssignment): ?>
+                    <div class="evaluation-note" style="margin-top: 10px;">
+                        <?php if ($followUpState !== 'preseleccionado'): ?>
+                        Debes dejarla como preseleccionada antes de asignarla.
+                        <?php elseif ($studentHasActiveInternship): ?>
                         El estudiante ya tiene otra pasantia activa.
                         <?php elseif (!$companyHasRoom): ?>
                         La empresa ya completo sus cupos.
-                        <?php else: ?>
-                        La evaluacion ya esta en revision.
                         <?php endif; ?>
                     </div>
+                    <?php endif; ?>
                     <?php else: ?>
-                    <span class="muted-line">Sin accion disponible</span>
+                    <span class="muted-line">Solo aplica seguimiento a evaluaciones aprobadas.</span>
                     <?php endif; ?>
                 </td>
                 <td><?php echo htmlspecialchars($formatDate($evaluation['tiempo_fin'] ?? $evaluation['tiempo_inicio'] ?? $evaluation['created_at'] ?? null, true)); ?></td>

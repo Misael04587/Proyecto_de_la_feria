@@ -5,9 +5,47 @@ class Evaluacion {
     public const MIN_PREGUNTAS = 15;
     public const DURACION_MINUTOS = 30;
     public const NOTA_APROBACION = 70;
+    private static $workflowBooted = false;
+
+    public static function ensureWorkflowSchema() {
+        if (self::$workflowBooted) {
+            return;
+        }
+
+        $stateColumn = Database::selectOne("SHOW COLUMNS FROM evaluaciones LIKE 'seguimiento_estado'");
+        if (!$stateColumn) {
+            Database::execute("
+                ALTER TABLE evaluaciones
+                ADD COLUMN seguimiento_estado ENUM('sin_revisar', 'en_revision', 'preseleccionado', 'descartado')
+                    NOT NULL DEFAULT 'sin_revisar'
+                    AFTER estado
+            ");
+        }
+
+        $commentColumn = Database::selectOne("SHOW COLUMNS FROM evaluaciones LIKE 'seguimiento_comentario'");
+        if (!$commentColumn) {
+            Database::execute("
+                ALTER TABLE evaluaciones
+                ADD COLUMN seguimiento_comentario TEXT NULL
+                    AFTER seguimiento_estado
+            ");
+        }
+
+        $dateColumn = Database::selectOne("SHOW COLUMNS FROM evaluaciones LIKE 'seguimiento_fecha'");
+        if (!$dateColumn) {
+            Database::execute("
+                ALTER TABLE evaluaciones
+                ADD COLUMN seguimiento_fecha DATETIME NULL
+                    AFTER seguimiento_comentario
+            ");
+        }
+
+        self::$workflowBooted = true;
+    }
 
     public static function generarExamenUnico($estudiante_id, $empresa_id, $area_tecnica, $num_preguntas = null) {
         Pregunta::ensureSchema();
+        self::ensureWorkflowSchema();
         $pdo = Database::getInstance();
         $cantidad_preguntas = self::resolverCantidadPreguntas($area_tecnica, $num_preguntas);
 
@@ -100,6 +138,8 @@ class Evaluacion {
     }
 
     public static function getEvaluacionParaEstudiante($evaluacion_id, $estudiante_id) {
+        self::ensureWorkflowSchema();
+
         return Database::selectOne("
             SELECT
                 ev.*,
@@ -164,6 +204,7 @@ class Evaluacion {
     }
 
     public static function procesarExamen($evaluacion_id, $respuestas, $forzar_estado = null) {
+        self::ensureWorkflowSchema();
         $pdo = Database::getInstance();
 
         try {
@@ -219,7 +260,12 @@ class Evaluacion {
 
             $stmt = $pdo->prepare("
                 UPDATE evaluaciones
-                SET estado = ?, nota = ?, tiempo_fin = NOW()
+                SET estado = ?,
+                    seguimiento_estado = 'sin_revisar',
+                    seguimiento_comentario = NULL,
+                    seguimiento_fecha = NULL,
+                    nota = ?,
+                    tiempo_fin = NOW()
                 WHERE id = ?
             ");
             $stmt->execute([$estado_final, $nota, $evaluacion_id]);
@@ -259,10 +305,15 @@ class Evaluacion {
     }
 
     public static function getResumenEvaluacion($evaluacion_id) {
+        self::ensureWorkflowSchema();
+
         $evaluacion = Database::selectOne("
             SELECT
                 ev.id,
                 ev.estado,
+                ev.seguimiento_estado,
+                ev.seguimiento_comentario,
+                ev.seguimiento_fecha,
                 ev.nota,
                 ev.tiempo_inicio,
                 ev.tiempo_fin,
@@ -294,11 +345,16 @@ class Evaluacion {
     }
 
     public static function getHistorialPorEstudiante($estudiante_id) {
+        self::ensureWorkflowSchema();
+
         return Database::select("
             SELECT
                 ev.id,
                 ev.empresa_id,
                 ev.estado,
+                ev.seguimiento_estado,
+                ev.seguimiento_comentario,
+                ev.seguimiento_fecha,
                 ev.nota,
                 ev.tiempo_inicio,
                 ev.tiempo_fin,
@@ -332,6 +388,9 @@ class Evaluacion {
                 ev.id,
                 ev.empresa_id,
                 ev.estado,
+                ev.seguimiento_estado,
+                ev.seguimiento_comentario,
+                ev.seguimiento_fecha,
                 ev.nota,
                 ev.tiempo_inicio,
                 ev.tiempo_fin,
@@ -349,11 +408,16 @@ class Evaluacion {
     }
 
     public static function getDetalleRevisionParaEstudiante($evaluacion_id, $estudiante_id) {
+        self::ensureWorkflowSchema();
+
         $resumen = Database::selectOne("
             SELECT
                 ev.id,
                 ev.empresa_id,
                 ev.estado,
+                ev.seguimiento_estado,
+                ev.seguimiento_comentario,
+                ev.seguimiento_fecha,
                 ev.nota,
                 ev.tiempo_inicio,
                 ev.tiempo_fin,
@@ -388,6 +452,9 @@ class Evaluacion {
                 ev.id,
                 ev.empresa_id,
                 ev.estado,
+                ev.seguimiento_estado,
+                ev.seguimiento_comentario,
+                ev.seguimiento_fecha,
                 ev.nota,
                 ev.tiempo_inicio,
                 ev.tiempo_fin,
@@ -430,6 +497,69 @@ class Evaluacion {
         ", [$evaluacion_id, $estudiante_id]);
 
         return $resumen;
+    }
+
+    public static function saveSeguimiento($evaluacion_id, $centerId, $seguimientoEstado, $comentario = '') {
+        self::ensureWorkflowSchema();
+
+        $evaluacion_id = (int) $evaluacion_id;
+        $centerId = (int) $centerId;
+        $seguimientoEstado = trim((string) $seguimientoEstado);
+        $comentario = trim((string) $comentario);
+
+        if ($evaluacion_id <= 0 || $centerId <= 0) {
+            throw new InvalidArgumentException('Datos invalidos para revisar la evaluacion');
+        }
+
+        if (!in_array($seguimientoEstado, ['sin_revisar', 'en_revision', 'preseleccionado', 'descartado'], true)) {
+            throw new InvalidArgumentException('Estado de seguimiento no valido');
+        }
+
+        $commentLength = function_exists('mb_strlen')
+            ? mb_strlen($comentario, 'UTF-8')
+            : strlen($comentario);
+
+        if ($commentLength > 2000) {
+            throw new InvalidArgumentException('El comentario de seguimiento no puede superar 2000 caracteres');
+        }
+
+        $evaluation = Database::selectOne("
+            SELECT ev.id, ev.estado, est.centro_id
+            FROM evaluaciones ev
+            JOIN estudiantes est ON est.id = ev.estudiante_id
+            WHERE ev.id = ?
+            LIMIT 1
+        ", [$evaluacion_id]);
+
+        if (!$evaluation || (int) ($evaluation['centro_id'] ?? 0) !== $centerId) {
+            throw new RuntimeException('No se encontro la evaluacion seleccionada');
+        }
+
+        if (($evaluation['estado'] ?? '') !== 'aprobado') {
+            throw new RuntimeException('Solo puedes revisar evaluaciones aprobadas');
+        }
+
+        $commentValue = $comentario !== '' ? $comentario : null;
+        $reviewDate = ($seguimientoEstado === 'sin_revisar' && $commentValue === null)
+            ? null
+            : date('Y-m-d H:i:s');
+
+        $updated = Database::execute("
+            UPDATE evaluaciones
+            SET seguimiento_estado = ?,
+                seguimiento_comentario = ?,
+                seguimiento_fecha = ?
+            WHERE id = ?
+        ", [
+            $seguimientoEstado,
+            $commentValue,
+            $reviewDate,
+            $evaluacion_id,
+        ]);
+
+        if (!$updated) {
+            throw new RuntimeException('No se pudo guardar el seguimiento de la evaluacion');
+        }
     }
 
     private static function getPreguntasParaProcesar(PDO $pdo, $evaluacion_id) {

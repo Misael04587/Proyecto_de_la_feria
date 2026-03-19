@@ -45,6 +45,7 @@ class AdminController {
     public function manageCompanies() {
         $context = $this->buildBaseContext('companies');
         $centerId = (int) $context['centro']['id'];
+        Evaluacion::ensureWorkflowSchema();
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $this->handleCompanyManagementAction($centerId);
@@ -117,6 +118,35 @@ class AdminController {
         }
 
         $context['companyFormData'] = $formData ?: $this->getDefaultCompanyFormData();
+        $historyCompanyId = (int) ($_GET['history'] ?? 0);
+        $context['selectedCompanyHistory'] = $this->getCompanyForCenter($historyCompanyId, $centerId);
+        $context['companyHistoryRows'] = [];
+
+        if (!empty($context['selectedCompanyHistory'])) {
+            $context['companyHistoryRows'] = Database::select("
+                SELECT
+                    ev.id,
+                    u.nombre AS estudiante_nombre,
+                    est.matricula,
+                    est.area_tecnica AS estudiante_area,
+                    ev.estado,
+                    ev.seguimiento_estado,
+                    ev.seguimiento_comentario,
+                    ev.seguimiento_fecha,
+                    ev.nota,
+                    COALESCE(ev.tiempo_fin, ev.tiempo_inicio, ev.created_at) AS fecha_evaluacion,
+                    a.estado AS asignacion_estado,
+                    a.fecha_asignacion
+                FROM evaluaciones ev
+                JOIN estudiantes est ON est.id = ev.estudiante_id
+                JOIN usuarios u ON u.id = est.usuario_id
+                LEFT JOIN asignaciones a
+                    ON a.estudiante_id = ev.estudiante_id
+                   AND a.empresa_id = ev.empresa_id
+                WHERE ev.empresa_id = ? AND est.centro_id = ?
+                ORDER BY COALESCE(ev.tiempo_fin, ev.tiempo_inicio, ev.created_at) DESC, ev.id DESC
+            ", [$historyCompanyId, $centerId]);
+        }
 
         $this->renderPage('companies', $context);
     }
@@ -290,6 +320,7 @@ class AdminController {
     public function manageStudents() {
         $context = $this->buildBaseContext('students');
         $centerId = (int) $context['centro']['id'];
+        Evaluacion::ensureWorkflowSchema();
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $this->handleStudentManagementAction($centerId);
@@ -347,6 +378,13 @@ class AdminController {
                     LIMIT 1
                 ) AS ultima_evaluacion_nota,
                 (
+                    SELECT ev.seguimiento_estado
+                    FROM evaluaciones ev
+                    WHERE ev.estudiante_id = e.id
+                    ORDER BY COALESCE(ev.tiempo_fin, ev.tiempo_inicio, ev.created_at) DESC, ev.id DESC
+                    LIMIT 1
+                ) AS ultima_evaluacion_seguimiento_estado,
+                (
                     SELECT a.id
                     FROM asignaciones a
                     WHERE a.estudiante_id = e.id AND a.estado = 'activa'
@@ -374,12 +412,41 @@ class AdminController {
             ORDER BY e.created_at DESC, e.id DESC
         ", $params);
 
+        $historyStudentId = (int) ($_GET['history'] ?? 0);
+        $context['selectedStudentHistory'] = $this->getStudentForCenter($historyStudentId, $centerId);
+        $context['studentHistoryRows'] = [];
+
+        if (!empty($context['selectedStudentHistory'])) {
+            $context['studentHistoryRows'] = Database::select("
+                SELECT
+                    ev.id,
+                    em.nombre AS empresa_nombre,
+                    em.area_tecnica AS empresa_area,
+                    ev.estado,
+                    ev.seguimiento_estado,
+                    ev.seguimiento_comentario,
+                    ev.seguimiento_fecha,
+                    ev.nota,
+                    COALESCE(ev.tiempo_fin, ev.tiempo_inicio, ev.created_at) AS fecha_evaluacion,
+                    a.estado AS asignacion_estado,
+                    a.fecha_asignacion
+                FROM evaluaciones ev
+                JOIN empresas em ON em.id = ev.empresa_id
+                LEFT JOIN asignaciones a
+                    ON a.estudiante_id = ev.estudiante_id
+                   AND a.empresa_id = ev.empresa_id
+                WHERE ev.estudiante_id = ?
+                ORDER BY COALESCE(ev.tiempo_fin, ev.tiempo_inicio, ev.created_at) DESC, ev.id DESC
+            ", [$historyStudentId]);
+        }
+
         $this->renderPage('students', $context);
     }
 
     public function viewEvaluations() {
         $context = $this->buildBaseContext('evaluations');
         $centerId = (int) $context['centro']['id'];
+        Evaluacion::ensureWorkflowSchema();
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $this->handleEvaluationManagementAction($centerId);
@@ -388,10 +455,19 @@ class AdminController {
         $filters = [
             'area' => $this->sanitizeAreaFilter($_GET['area'] ?? '', $centerId),
             'estado' => $this->sanitizeEnumFilter($_GET['estado'] ?? '', ['pendiente', 'aprobado', 'reprobado', 'anulado']),
+            'seguimiento' => $this->sanitizeEnumFilter($_GET['seguimiento'] ?? '', array_keys($this->getEvaluationFollowUpOptions())),
+            'empresa_id' => 0,
+            'fecha_desde' => $this->sanitizeDateFilter($_GET['fecha_desde'] ?? ''),
+            'fecha_hasta' => $this->sanitizeDateFilter($_GET['fecha_hasta'] ?? ''),
         ];
+
+        $selectedCompany = $this->getCompanyForCenter((int) ($_GET['empresa_id'] ?? 0), $centerId);
+        $filters['empresa_id'] = $selectedCompany ? (int) ($selectedCompany['id'] ?? 0) : 0;
 
         $where = ["est.centro_id = ?"];
         $params = [$centerId];
+        $evaluationDateExpression = "DATE(COALESCE(ev.tiempo_fin, ev.tiempo_inicio, ev.created_at))";
+
         if ($filters['area'] !== '') {
             $where[] = "est.area_tecnica = ?";
             $params[] = $filters['area'];
@@ -400,13 +476,34 @@ class AdminController {
             $where[] = "ev.estado = ?";
             $params[] = $filters['estado'];
         }
+        if ($filters['seguimiento'] !== '') {
+            $where[] = "ev.seguimiento_estado = ?";
+            $params[] = $filters['seguimiento'];
+        }
+        if ($filters['empresa_id'] > 0) {
+            $where[] = "ev.empresa_id = ?";
+            $params[] = $filters['empresa_id'];
+        }
+        if ($filters['fecha_desde'] !== '') {
+            $where[] = "$evaluationDateExpression >= ?";
+            $params[] = $filters['fecha_desde'];
+        }
+        if ($filters['fecha_hasta'] !== '') {
+            $where[] = "$evaluationDateExpression <= ?";
+            $params[] = $filters['fecha_hasta'];
+        }
 
         $context['filters'] = $filters;
         $context['csrfToken'] = Security::generateCSRFToken();
+        $context['companyOptions'] = $this->getCompanyOptions($centerId);
+        $context['followUpOptions'] = $this->getEvaluationFollowUpOptions();
         $context['evaluations'] = Database::select("
             SELECT
                 ev.id,
                 ev.estado,
+                ev.seguimiento_estado,
+                ev.seguimiento_comentario,
+                ev.seguimiento_fecha,
                 ev.nota,
                 ev.tiempo_inicio,
                 ev.tiempo_fin,
@@ -456,90 +553,388 @@ class AdminController {
     public function reports() {
         $context = $this->buildBaseContext('reports');
         $centerId = (int) $context['centro']['id'];
-        $areas = $this->getAreaLabels($centerId);
+        Evaluacion::ensureWorkflowSchema();
 
-        $companiesByArea = $this->keyByArea(Database::select("
-            SELECT area_tecnica, COUNT(*) AS total, COALESCE(SUM(cupos), 0) AS cupos
-            FROM empresas
-            WHERE centro_id = ?
-            GROUP BY area_tecnica
-        ", [$centerId]));
+        $followUpOptions = $this->getEvaluationFollowUpOptions();
+        $filters = [
+            'area' => $this->sanitizeAreaFilter($_GET['area'] ?? '', $centerId),
+            'empresa_id' => 0,
+            'estado' => $this->sanitizeEnumFilter($_GET['estado'] ?? '', ['pendiente', 'aprobado', 'reprobado', 'anulado']),
+            'seguimiento' => $this->sanitizeEnumFilter($_GET['seguimiento'] ?? '', array_keys($followUpOptions)),
+            'pasantia' => $this->sanitizeEnumFilter($_GET['pasantia'] ?? '', ['activa', 'finalizada', 'cancelada', 'sin_pasantia']),
+            'fecha_desde' => $this->sanitizeDateFilter($_GET['fecha_desde'] ?? ''),
+            'fecha_hasta' => $this->sanitizeDateFilter($_GET['fecha_hasta'] ?? ''),
+            'export' => $this->sanitizeEnumFilter($_GET['export'] ?? '', ['csv', 'excel', 'pdf']),
+        ];
 
-        $studentsByArea = $this->keyByArea(Database::select("
-            SELECT
-                area_tecnica,
-                COUNT(*) AS total,
-                SUM(CASE WHEN cv_path IS NOT NULL AND cv_path <> '' THEN 1 ELSE 0 END) AS con_cv
-            FROM estudiantes
-            WHERE centro_id = ?
-            GROUP BY area_tecnica
-        ", [$centerId]));
+        $selectedCompany = $this->getCompanyForCenter((int) ($_GET['empresa_id'] ?? 0), $centerId);
+        $filters['empresa_id'] = $selectedCompany ? (int) ($selectedCompany['id'] ?? 0) : 0;
 
-        $evaluationsByArea = $this->keyByArea(Database::select("
-            SELECT
-                est.area_tecnica,
-                COUNT(*) AS total,
-                SUM(CASE WHEN ev.estado = 'aprobado' THEN 1 ELSE 0 END) AS aprobadas,
-                AVG(ev.nota) AS promedio
-            FROM evaluaciones ev
-            JOIN estudiantes est ON est.id = ev.estudiante_id
-            WHERE est.centro_id = ?
-            GROUP BY est.area_tecnica
-        ", [$centerId]));
+        $reportRows = $this->buildReportDataset($centerId, $filters);
 
-        $assignmentsByArea = $this->keyByArea(Database::select("
-            SELECT
-                est.area_tecnica,
-                COUNT(*) AS total,
-                SUM(CASE WHEN a.estado = 'activa' THEN 1 ELSE 0 END) AS activas
-            FROM asignaciones a
-            JOIN estudiantes est ON est.id = a.estudiante_id
-            WHERE est.centro_id = ?
-            GROUP BY est.area_tecnica
-        ", [$centerId]));
+        if ($filters['export'] !== '') {
+            $this->exportReportDataset($filters['export'], $reportRows, $filters, $centerId);
+        }
+
+        $areaBuckets = [];
+        foreach ($reportRows as $row) {
+            $areaKey = trim((string) ($row['area_tecnica'] ?? ''));
+            if ($areaKey === '') {
+                continue;
+            }
+
+            if (!isset($areaBuckets[$areaKey])) {
+                $areaBuckets[$areaKey] = [
+                    'label' => $areaKey,
+                    'companies' => [],
+                    'students' => [],
+                    'evaluations' => 0,
+                    'approved' => 0,
+                    'preselected' => 0,
+                    'internships' => 0,
+                ];
+            }
+
+            $areaBuckets[$areaKey]['evaluations']++;
+            $areaBuckets[$areaKey]['companies'][(int) ($row['empresa_id'] ?? 0)] = true;
+            $areaBuckets[$areaKey]['students'][(int) ($row['estudiante_id'] ?? 0)] = true;
+
+            if (($row['estado'] ?? '') === 'aprobado') {
+                $areaBuckets[$areaKey]['approved']++;
+            }
+
+            if (($row['seguimiento_estado'] ?? '') === 'preseleccionado') {
+                $areaBuckets[$areaKey]['preselected']++;
+            }
+
+            if (($row['asignacion_estado'] ?? '') === 'activa') {
+                $areaBuckets[$areaKey]['internships']++;
+            }
+        }
 
         $areaReport = [];
-        foreach ($areas as $areaKey => $areaLabel) {
+        foreach ($areaBuckets as $bucket) {
             $areaReport[] = [
-                'label' => $areaLabel,
-                'companies' => (int) ($companiesByArea[$areaKey]['total'] ?? 0),
-                'slots' => (int) ($companiesByArea[$areaKey]['cupos'] ?? 0),
-                'students' => (int) ($studentsByArea[$areaKey]['total'] ?? 0),
-                'students_cv' => (int) ($studentsByArea[$areaKey]['con_cv'] ?? 0),
-                'evaluations' => (int) ($evaluationsByArea[$areaKey]['total'] ?? 0),
-                'approved' => (int) ($evaluationsByArea[$areaKey]['aprobadas'] ?? 0),
-                'average' => $evaluationsByArea[$areaKey]['promedio'] ?? null,
-                'internships' => (int) ($assignmentsByArea[$areaKey]['activas'] ?? 0),
+                'label' => $bucket['label'],
+                'companies' => count($bucket['companies']),
+                'students' => count($bucket['students']),
+                'evaluations' => $bucket['evaluations'],
+                'approved' => $bucket['approved'],
+                'preselected' => $bucket['preselected'],
+                'internships' => $bucket['internships'],
             ];
         }
 
-        $context['areaReport'] = $areaReport;
-        $context['studentsWithoutCvList'] = Database::select("
-            SELECT u.nombre, e.matricula, e.area_tecnica, e.created_at
-            FROM estudiantes e
-            JOIN usuarios u ON u.id = e.usuario_id
-            WHERE e.centro_id = ? AND (e.cv_path IS NULL OR e.cv_path = '')
-            ORDER BY e.created_at DESC, e.id DESC
-            LIMIT 6
-        ", [$centerId]);
+        usort($areaReport, function ($left, $right) {
+            return strcmp((string) ($left['label'] ?? ''), (string) ($right['label'] ?? ''));
+        });
 
-        $context['topCompanies'] = Database::select("
-            SELECT
-                e.nombre,
-                e.area_tecnica,
-                e.cupos,
-                (
-                    SELECT COUNT(*)
-                    FROM asignaciones a
-                    WHERE a.empresa_id = e.id AND a.estado = 'activa'
-                ) AS activas
-            FROM empresas e
-            WHERE e.centro_id = ?
-            ORDER BY activas DESC, e.nombre ASC
-            LIMIT 6
-        ", [$centerId]);
+        $context['filters'] = $filters;
+        $context['companyOptions'] = $this->getCompanyOptions($centerId);
+        $context['followUpOptions'] = $followUpOptions;
+        $context['reportRows'] = $reportRows;
+        $context['areaReport'] = $areaReport;
+        $context['reportSummary'] = [
+            'total' => count($reportRows),
+            'approved' => count(array_filter($reportRows, function ($row) {
+                return ($row['estado'] ?? '') === 'aprobado';
+            })),
+            'preselected' => count(array_filter($reportRows, function ($row) {
+                return ($row['seguimiento_estado'] ?? '') === 'preseleccionado';
+            })),
+            'assigned' => count(array_filter($reportRows, function ($row) {
+                return !empty($row['asignacion_estado']);
+            })),
+            'active' => count(array_filter($reportRows, function ($row) {
+                return ($row['asignacion_estado'] ?? '') === 'activa';
+            })),
+        ];
 
         $this->renderPage('reports', $context);
+    }
+
+    private function buildReportDataset($centerId, array $filters) {
+        $where = ["est.centro_id = ?"];
+        $params = [(int) $centerId];
+        $dateExpression = "DATE(COALESCE(ev.tiempo_fin, ev.tiempo_inicio, ev.created_at))";
+
+        if (($filters['area'] ?? '') !== '') {
+            $where[] = "est.area_tecnica = ?";
+            $params[] = $filters['area'];
+        }
+
+        if ((int) ($filters['empresa_id'] ?? 0) > 0) {
+            $where[] = "ev.empresa_id = ?";
+            $params[] = (int) $filters['empresa_id'];
+        }
+
+        if (($filters['estado'] ?? '') !== '') {
+            $where[] = "ev.estado = ?";
+            $params[] = $filters['estado'];
+        }
+
+        if (($filters['seguimiento'] ?? '') !== '') {
+            $where[] = "ev.seguimiento_estado = ?";
+            $params[] = $filters['seguimiento'];
+        }
+
+        if (($filters['pasantia'] ?? '') === 'sin_pasantia') {
+            $where[] = "a.id IS NULL";
+        } elseif (($filters['pasantia'] ?? '') !== '') {
+            $where[] = "a.estado = ?";
+            $params[] = $filters['pasantia'];
+        }
+
+        if (($filters['fecha_desde'] ?? '') !== '') {
+            $where[] = "$dateExpression >= ?";
+            $params[] = $filters['fecha_desde'];
+        }
+
+        if (($filters['fecha_hasta'] ?? '') !== '') {
+            $where[] = "$dateExpression <= ?";
+            $params[] = $filters['fecha_hasta'];
+        }
+
+        return Database::select("
+            SELECT
+                ev.id,
+                ev.estudiante_id,
+                ev.empresa_id,
+                ev.estado,
+                ev.seguimiento_estado,
+                ev.seguimiento_comentario,
+                ev.seguimiento_fecha,
+                ev.nota,
+                COALESCE(ev.tiempo_fin, ev.tiempo_inicio, ev.created_at) AS fecha_evaluacion,
+                est.matricula,
+                est.area_tecnica,
+                u.nombre AS estudiante_nombre,
+                em.nombre AS empresa_nombre,
+                a.estado AS asignacion_estado,
+                a.fecha_asignacion
+            FROM evaluaciones ev
+            JOIN estudiantes est ON est.id = ev.estudiante_id
+            JOIN usuarios u ON u.id = est.usuario_id
+            JOIN empresas em ON em.id = ev.empresa_id
+            LEFT JOIN asignaciones a
+                ON a.estudiante_id = ev.estudiante_id
+               AND a.empresa_id = ev.empresa_id
+            WHERE " . implode(' AND ', $where) . "
+            ORDER BY COALESCE(ev.tiempo_fin, ev.tiempo_inicio, ev.created_at) DESC, ev.id DESC
+        ", $params);
+    }
+
+    private function exportReportDataset($format, array $reportRows, array $filters, $centerId) {
+        $headers = ['Fecha', 'Estudiante', 'Matricula', 'Area', 'Empresa', 'Estado examen', 'Seguimiento', 'Nota', 'Pasantia', 'Fecha asignacion', 'Comentario'];
+        $followUpOptions = $this->getEvaluationFollowUpOptions();
+        $assignmentLabels = [
+            '' => 'Sin pasantia',
+            'activa' => 'Activa',
+            'finalizada' => 'Finalizada',
+            'cancelada' => 'Cancelada',
+        ];
+
+        $rows = [];
+        foreach ($reportRows as $row) {
+            $rows[] = [
+                $this->formatExportDate($row['fecha_evaluacion'] ?? null),
+                $row['estudiante_nombre'] ?? 'Sin estudiante',
+                $row['matricula'] ?? 'Sin matricula',
+                $row['area_tecnica'] ?? 'Sin area',
+                $row['empresa_nombre'] ?? 'Sin empresa',
+                ucfirst((string) ($row['estado'] ?? 'sin estado')),
+                $followUpOptions[$row['seguimiento_estado'] ?? ''] ?? 'Sin seguimiento',
+                $row['nota'] !== null ? number_format((float) $row['nota'], 1) : 'Sin nota',
+                $assignmentLabels[$row['asignacion_estado'] ?? ''] ?? ucfirst((string) ($row['asignacion_estado'] ?? '')),
+                $this->formatExportDate($row['fecha_asignacion'] ?? null, false),
+                trim((string) ($row['seguimiento_comentario'] ?? '')),
+            ];
+        }
+
+        $fileBase = 'reporte_fase2_' . date('Ymd_His');
+        if ($format === 'csv') {
+            $this->sendCsvDownload($fileBase . '.csv', $headers, $rows);
+        }
+        if ($format === 'excel') {
+            $this->sendExcelDownload($fileBase . '.xls', $headers, $rows);
+        }
+        if ($format === 'pdf') {
+            $company = $this->getCompanyForCenter((int) ($filters['empresa_id'] ?? 0), $centerId);
+            $filterSummary = $this->buildReportFilterSummary($filters, $company);
+            $this->sendPdfDownload($fileBase . '.pdf', 'Reporte academico de pasantias', $headers, $rows, $filterSummary);
+        }
+    }
+
+    private function formatExportDate($value, $withTime = true) {
+        if (empty($value)) {
+            return 'Sin registrar';
+        }
+
+        $timestamp = strtotime((string) $value);
+        if ($timestamp === false) {
+            return 'Sin registrar';
+        }
+
+        return date($withTime ? 'd/m/Y h:i A' : 'd/m/Y', $timestamp);
+    }
+
+    private function buildReportFilterSummary(array $filters, $company = null) {
+        $parts = [];
+
+        if (($filters['area'] ?? '') !== '') {
+            $parts[] = 'Area: ' . $filters['area'];
+        }
+        if (!empty($company['nombre'])) {
+            $parts[] = 'Empresa: ' . $company['nombre'];
+        }
+        if (($filters['estado'] ?? '') !== '') {
+            $parts[] = 'Estado examen: ' . ucfirst($filters['estado']);
+        }
+        if (($filters['seguimiento'] ?? '') !== '') {
+            $parts[] = 'Seguimiento: ' . ($this->getEvaluationFollowUpOptions()[$filters['seguimiento']] ?? $filters['seguimiento']);
+        }
+        if (($filters['pasantia'] ?? '') !== '') {
+            $parts[] = 'Pasantia: ' . ucfirst(str_replace('_', ' ', $filters['pasantia']));
+        }
+        if (($filters['fecha_desde'] ?? '') !== '') {
+            $parts[] = 'Desde: ' . $filters['fecha_desde'];
+        }
+        if (($filters['fecha_hasta'] ?? '') !== '') {
+            $parts[] = 'Hasta: ' . $filters['fecha_hasta'];
+        }
+
+        return implode(' | ', $parts);
+    }
+
+    private function sendCsvDownload($fileName, array $headers, array $rows) {
+        header('Content-Type: text/csv; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="' . $fileName . '"');
+
+        $output = fopen('php://output', 'w');
+        fprintf($output, chr(0xEF) . chr(0xBB) . chr(0xBF));
+        fputcsv($output, $headers);
+
+        foreach ($rows as $row) {
+            fputcsv($output, $row);
+        }
+
+        fclose($output);
+        exit;
+    }
+
+    private function sendExcelDownload($fileName, array $headers, array $rows) {
+        header('Content-Type: application/vnd.ms-excel; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="' . $fileName . '"');
+
+        echo chr(0xEF) . chr(0xBB) . chr(0xBF);
+        echo implode("\t", array_map([$this, 'sanitizeExportCell'], $headers)) . "\n";
+        foreach ($rows as $row) {
+            echo implode("\t", array_map([$this, 'sanitizeExportCell'], $row)) . "\n";
+        }
+
+        exit;
+    }
+
+    private function sanitizeExportCell($value) {
+        $value = str_replace(["\r", "\n", "\t"], ' ', (string) $value);
+        return trim($value);
+    }
+
+    private function sendPdfDownload($fileName, $title, array $headers, array $rows, $filterSummary = '') {
+        $lines = [
+            $title,
+            'Generado: ' . date('d/m/Y h:i A'),
+        ];
+
+        if ($filterSummary !== '') {
+            $lines[] = 'Filtros: ' . $filterSummary;
+        }
+
+        $lines[] = '';
+        $lines[] = implode(' | ', $headers);
+        $lines[] = str_repeat('-', 110);
+
+        foreach ($rows as $row) {
+            $lines[] = implode(' | ', array_map(function ($value) {
+                $value = $this->sanitizeExportCell($value);
+                return function_exists('mb_substr')
+                    ? mb_substr($value, 0, 28, 'UTF-8')
+                    : substr($value, 0, 28);
+            }, $row));
+        }
+
+        $pdf = $this->buildSimplePdfDocument($lines);
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: attachment; filename="' . $fileName . '"');
+        header('Content-Length: ' . strlen($pdf));
+        echo $pdf;
+        exit;
+    }
+
+    private function buildSimplePdfDocument(array $lines) {
+        $pages = array_chunk($lines, 40);
+        $objects = [];
+        $objects[1] = '<< /Type /Catalog /Pages 2 0 R >>';
+        $objects[3] = '<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>';
+
+        $pageRefs = [];
+        $nextId = 4;
+
+        foreach ($pages as $pageLines) {
+            $pageId = $nextId++;
+            $contentId = $nextId++;
+            $pageRefs[] = $pageId . ' 0 R';
+
+            $streamLines = ['BT', '/F1 10 Tf', '14 TL', '40 800 Td'];
+            foreach ($pageLines as $lineIndex => $line) {
+                if ($lineIndex > 0) {
+                    $streamLines[] = 'T*';
+                }
+                $streamLines[] = '(' . $this->escapePdfText($line) . ') Tj';
+            }
+            $streamLines[] = 'ET';
+
+            $stream = implode("\n", $streamLines);
+            $objects[$pageId] = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 842] /Contents ' . $contentId . ' 0 R /Resources << /Font << /F1 3 0 R >> >> >>';
+            $objects[$contentId] = "<< /Length " . strlen($stream) . " >>\nstream\n" . $stream . "\nendstream";
+        }
+
+        $objects[2] = '<< /Type /Pages /Kids [' . implode(' ', $pageRefs) . '] /Count ' . count($pageRefs) . ' >>';
+        ksort($objects);
+
+        $pdf = "%PDF-1.4\n";
+        $offsets = [0];
+
+        foreach ($objects as $id => $body) {
+            $offsets[$id] = strlen($pdf);
+            $pdf .= $id . " 0 obj\n" . $body . "\nendobj\n";
+        }
+
+        $xrefPosition = strlen($pdf);
+        $maxId = max(array_keys($objects));
+        $pdf .= "xref\n0 " . ($maxId + 1) . "\n";
+        $pdf .= "0000000000 65535 f \n";
+
+        for ($index = 1; $index <= $maxId; $index++) {
+            $offset = $offsets[$index] ?? 0;
+            $pdf .= str_pad((string) $offset, 10, '0', STR_PAD_LEFT) . " 00000 n \n";
+        }
+
+        $pdf .= "trailer\n<< /Size " . ($maxId + 1) . " /Root 1 0 R >>\nstartxref\n" . $xrefPosition . "\n%%EOF";
+        return $pdf;
+    }
+
+    private function escapePdfText($text) {
+        $text = $this->sanitizeExportCell($text);
+        if (function_exists('iconv')) {
+            $converted = @iconv('UTF-8', 'Windows-1252//TRANSLIT//IGNORE', $text);
+            if ($converted !== false) {
+                $text = $converted;
+            }
+        }
+
+        $text = str_replace(['\\', '(', ')'], ['\\\\', '\(', '\)'], $text);
+        return $text;
     }
 
     public function manageAreas() {
@@ -735,6 +1130,49 @@ class AdminController {
     private function sanitizeEnumFilter($value, array $allowed) {
         $value = trim((string) $value);
         return in_array($value, $allowed, true) ? $value : '';
+    }
+
+    private function sanitizeDateFilter($value) {
+        $value = trim((string) $value);
+        if ($value === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
+            return '';
+        }
+
+        $date = DateTime::createFromFormat('Y-m-d', $value);
+        return $date && $date->format('Y-m-d') === $value ? $value : '';
+    }
+
+    private function getCompanyOptions($centerId) {
+        return Database::select("
+            SELECT id, nombre
+            FROM empresas
+            WHERE centro_id = ?
+            ORDER BY nombre ASC
+        ", [(int) $centerId]);
+    }
+
+    private function getStudentForCenter($studentId, $centerId) {
+        return Database::selectOne("
+            SELECT
+                e.id,
+                e.matricula,
+                e.area_tecnica,
+                u.nombre,
+                u.correo
+            FROM estudiantes e
+            JOIN usuarios u ON u.id = e.usuario_id
+            WHERE e.id = ? AND e.centro_id = ?
+            LIMIT 1
+        ", [(int) $studentId, (int) $centerId]);
+    }
+
+    private function getEvaluationFollowUpOptions() {
+        return [
+            'sin_revisar' => 'Pendiente de revision',
+            'en_revision' => 'En revision',
+            'preseleccionado' => 'Preseleccionado',
+            'descartado' => 'Descartado',
+        ];
     }
 
     private function handleCompanyManagementAction($centerId) {
@@ -1529,22 +1967,46 @@ class AdminController {
         }
 
         $intent = trim((string) ($_POST['intent'] ?? ''));
-        if ($intent !== 'assign_evaluation') {
-            $this->redirectToEvaluations('Accion de evaluacion no reconocida', 'warning');
-        }
-
-        $evaluationId = (int) ($_POST['evaluation_id'] ?? 0);
-        if ($evaluationId <= 0) {
-            $this->redirectToEvaluations('Selecciona una evaluacion valida para asignar', 'error');
-        }
-
         try {
-            Asignacion::crearDesdeEvaluacion($evaluationId, $centerId);
+            if ($intent === 'assign_evaluation') {
+                $evaluationId = (int) ($_POST['evaluation_id'] ?? 0);
+                if ($evaluationId <= 0) {
+                    $this->redirectToEvaluations('Selecciona una evaluacion valida para asignar', 'error');
+                }
+
+                Asignacion::crearDesdeEvaluacion($evaluationId, $centerId);
+                $this->redirectToEvaluations('Pasantia asignada correctamente', 'success');
+            }
+
+            if ($intent === 'save_evaluation_review') {
+                $evaluationId = (int) ($_POST['evaluation_id'] ?? 0);
+                $followUpState = $this->sanitizeEnumFilter(
+                    $_POST['seguimiento_estado'] ?? '',
+                    array_keys($this->getEvaluationFollowUpOptions())
+                );
+
+                if ($evaluationId <= 0 || $followUpState === '') {
+                    $this->redirectToEvaluations('Datos invalidos para guardar el seguimiento', 'error');
+                }
+
+                Evaluacion::saveSeguimiento(
+                    $evaluationId,
+                    $centerId,
+                    $followUpState,
+                    $_POST['seguimiento_comentario'] ?? ''
+                );
+
+                $message = $followUpState === 'preseleccionado'
+                    ? 'Evaluacion preseleccionada y lista para asignacion'
+                    : 'Seguimiento academico guardado correctamente';
+
+                $this->redirectToEvaluations($message, 'success');
+            }
         } catch (Throwable $exception) {
             $this->redirectToEvaluations($exception->getMessage(), 'error');
         }
 
-        $this->redirectToEvaluations('Pasantia asignada correctamente', 'success');
+        $this->redirectToEvaluations('Accion de evaluacion no reconocida', 'warning');
     }
 
     private function updateStudentAssignmentStatus($centerId) {
