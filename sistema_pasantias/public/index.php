@@ -192,6 +192,7 @@ $controllerMap = [
     'login' => ['AuthController', 'login'],
     'logout' => ['AuthController', 'logout'],
     'register' => ['AuthController', 'register'],
+    'forgot-password' => ['AuthController', 'forgotPassword'],
     'center-register' => ['CenterController', 'register'],
     'center-areas' => ['CenterController', 'areas'],
     
@@ -206,6 +207,7 @@ $controllerMap = [
     // Administradores de centro
     'admin-dashboard' => ['AdminController', 'dashboard'],
     'admin-companies' => ['AdminController', 'manageCompanies'],
+    'admin-questions' => ['AdminController', 'manageQuestions'],
     'admin-students' => ['AdminController', 'manageStudents'],
     'admin-evaluations' => ['AdminController', 'viewEvaluations'],
     'admin-reports' => ['AdminController', 'reports'],
@@ -267,6 +269,7 @@ function checkRoutePermissions($page, $userRole) {
         // Rutas públicas
         'login' => ['guest', 'estudiante', 'coordinador', 'admin_centro', 'super_admin'],
         'register' => ['guest'],
+        'forgot-password' => ['guest', 'estudiante', 'coordinador', 'admin_centro', 'super_admin'],
         'center-register' => ['guest'],
         'center-areas' => ['guest', 'estudiante', 'coordinador', 'admin_centro', 'super_admin'],
         'logout' => ['estudiante', 'coordinador', 'admin_centro', 'super_admin'],
@@ -282,6 +285,7 @@ function checkRoutePermissions($page, $userRole) {
         // Rutas de administradores
         'admin-dashboard' => ['coordinador', 'admin_centro'],
         'admin-companies' => ['coordinador', 'admin_centro'],
+        'admin-questions' => ['coordinador', 'admin_centro'],
         'admin-students' => ['coordinador', 'admin_centro'],
         'admin-evaluations' => ['coordinador', 'admin_centro'],
         'admin-reports' => ['coordinador', 'admin_centro'],

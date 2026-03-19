@@ -629,7 +629,7 @@ $areaTecnica = $evaluacion['area_tecnica'] ?? ($resultado['area_tecnica'] ?? ($e
             $stateLabel = $estadoResultado === 'aprobado' ? 'Aprobado' : ($estadoResultado === 'anulado' ? 'Anulado' : 'Finalizado');
             $resultTitle = $estadoResultado === 'aprobado' ? 'Pasaste el examen' : ($estadoResultado === 'anulado' ? 'El examen fue anulado' : 'El examen no fue aprobado');
             $resultText = $estadoResultado === 'aprobado'
-                ? 'Tu resultado ya quedo registrado y la asignacion se genera si todavia hay cupo.'
+                ? 'Tu resultado ya quedo registrado. El centro ahora debe revisar tu aprobacion antes de asignarte a la empresa.'
                 : ($estadoResultado === 'anulado'
                     ? 'Se detecto un evento de seguridad durante el examen y el intento quedo cerrado.'
                     : 'Tu intento fue procesado. Revisa el resultado y sigue atento a las empresas disponibles.');

@@ -192,6 +192,11 @@ $csrfToken = $_SESSION['csrf_token'];
             // Mostrar/ocultar contraseña
             const togglePassword = document.getElementById('togglePassword');
             const passwordInput = document.getElementById('passwordInput');
+            const passwordRecoveryLink = document.querySelector('.form-options .forgot-link');
+
+            if (passwordRecoveryLink) {
+                passwordRecoveryLink.setAttribute('href', 'index.php?page=forgot-password');
+            }
             
             if (togglePassword && passwordInput) {
                 togglePassword.addEventListener('click', function() {

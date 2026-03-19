@@ -129,6 +129,27 @@ $cvPendientes = max((int) ($stats['estudiantes'] ?? 0) - (int) ($stats['cv_subid
         </div>
         <a href="index.php?page=admin-areas" class="card-btn"><i class="fas fa-plus-circle"></i> Gestionar areas</a>
     </article>
+
+    <article class="module-card">
+        <div class="module-head">
+            <div class="module-icon orange"><i class="fas fa-list-check"></i></div>
+            <div>
+                <h2 class="module-title">Banco de preguntas</h2>
+                <p class="module-subtitle">Carga y organiza las preguntas que alimentan los examenes tecnicos.</p>
+            </div>
+        </div>
+        <div class="metric-row">
+            <div class="metric-box">
+                <span class="summary-label">Areas cubiertas</span>
+                <strong><?php echo count($areaLabels ?? []); ?></strong>
+            </div>
+            <div class="metric-box">
+                <span class="summary-label">Minimo sugerido</span>
+                <strong><?php echo (int) Evaluacion::MIN_PREGUNTAS; ?></strong>
+            </div>
+        </div>
+        <a href="index.php?page=admin-questions" class="card-btn"><i class="fas fa-list-check"></i> Abrir modulo</a>
+    </article>
 </section>
 
 <section class="admin-split">

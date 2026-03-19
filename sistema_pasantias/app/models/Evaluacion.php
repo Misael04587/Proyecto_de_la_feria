@@ -7,6 +7,7 @@ class Evaluacion {
     public const NOTA_APROBACION = 70;
 
     public static function generarExamenUnico($estudiante_id, $empresa_id, $area_tecnica, $num_preguntas = null) {
+        Pregunta::ensureSchema();
         $pdo = Database::getInstance();
         $cantidad_preguntas = self::resolverCantidadPreguntas($area_tecnica, $num_preguntas);
 
@@ -36,6 +37,7 @@ class Evaluacion {
                 SELECT id
                 FROM preguntas
                 WHERE area_tecnica = ?
+                  AND estado = 'activo'
                 ORDER BY RAND()
                 LIMIT ?
             ");
@@ -69,10 +71,12 @@ class Evaluacion {
     }
 
     public static function getCantidadPreguntasDisponible($area_tecnica) {
+        Pregunta::ensureSchema();
         $resultado = Database::selectOne("
             SELECT COUNT(*) AS total
             FROM preguntas
             WHERE area_tecnica = ?
+              AND estado = 'activo'
         ", [$area_tecnica]);
 
         return (int) ($resultado['total'] ?? 0);
@@ -219,13 +223,6 @@ class Evaluacion {
                 WHERE id = ?
             ");
             $stmt->execute([$estado_final, $nota, $evaluacion_id]);
-
-            if ($estado_final === 'aprobado') {
-                self::crearAsignacionSiAplica($pdo, $evaluacion['estudiante_id'], $evaluacion['empresa_id']);
-                self::sincronizarEstadoEmpresa($pdo, $evaluacion['empresa_id']);
-            } elseif (in_array($estado_final, ['reprobado', 'anulado'], true)) {
-                self::sincronizarEstadoEmpresa($pdo, $evaluacion['empresa_id']);
-            }
 
             $pdo->commit();
             return self::getResumenEvaluacion($evaluacion_id);
@@ -455,54 +452,5 @@ class Evaluacion {
 
         $respuesta = strtolower(trim($respuesta));
         return in_array($respuesta, ['a', 'b', 'c', 'd'], true) ? $respuesta : null;
-    }
-
-    private static function crearAsignacionSiAplica(PDO $pdo, $estudiante_id, $empresa_id) {
-        $stmt = $pdo->prepare("
-            SELECT id
-            FROM asignaciones
-            WHERE estudiante_id = ?
-            LIMIT 1
-        ");
-        $stmt->execute([$estudiante_id]);
-
-        if ($stmt->fetch()) {
-            return;
-        }
-
-        $stmt = $pdo->prepare("
-            INSERT INTO asignaciones (estudiante_id, empresa_id, fecha_asignacion, estado)
-            VALUES (?, ?, CURDATE(), 'activa')
-        ");
-        $stmt->execute([$estudiante_id, $empresa_id]);
-    }
-
-    private static function sincronizarEstadoEmpresa(PDO $pdo, $empresa_id) {
-        $stmt = $pdo->prepare("
-            SELECT
-                e.cupos,
-                (
-                    SELECT COUNT(*)
-                    FROM asignaciones a
-                    WHERE a.empresa_id = e.id AND a.estado = 'activa'
-                ) AS asignados
-            FROM empresas e
-            WHERE e.id = ?
-            LIMIT 1
-        ");
-        $stmt->execute([$empresa_id]);
-        $empresa = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if (!$empresa) {
-            return;
-        }
-
-        $estado = ((int) $empresa['asignados'] >= (int) $empresa['cupos']) ? 'completo' : 'disponible';
-        $stmt = $pdo->prepare("
-            UPDATE empresas
-            SET estado = ?
-            WHERE id = ?
-        ");
-        $stmt->execute([$estado, $empresa_id]);
     }
 }

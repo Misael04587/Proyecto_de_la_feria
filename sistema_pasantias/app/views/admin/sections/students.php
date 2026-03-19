@@ -2,6 +2,18 @@
 $studentsWithCv = (int) ($stats['cv_subidos'] ?? 0);
 $studentsTotal = (int) ($stats['estudiantes'] ?? 0);
 $studentsWithoutCv = max($studentsTotal - $studentsWithCv, 0);
+$formatDate = function ($value, $withTime = true) {
+    if (empty($value)) {
+        return 'Sin registrar';
+    }
+
+    $timestamp = strtotime((string) $value);
+    if ($timestamp === false) {
+        return 'Sin registrar';
+    }
+
+    return date($withTime ? 'd/m/Y h:i A' : 'd/m/Y', $timestamp);
+};
 ?>
 <section class="summary-strip">
     <article class="summary-card">
@@ -172,6 +184,35 @@ $studentsWithoutCv = max($studentsTotal - $studentsWithCv, 0);
                         <?php if (!empty($student['empresa_activa'])): ?>
                         <span class="pill pill-blue">Activa</span>
                         <div class="muted-line"><?php echo htmlspecialchars($student['empresa_activa']); ?></div>
+                        <div class="muted-line">
+                            Desde <?php echo htmlspecialchars($formatDate($student['asignacion_activa_fecha'] ?? null, false)); ?>
+                        </div>
+                        <?php if (!empty($student['asignacion_activa_id'])): ?>
+                        <div class="student-inline-actions" style="margin-top: 12px;">
+                            <form method="POST" action="index.php?page=admin-students" class="student-inline-form">
+                                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken ?? ''); ?>">
+                                <input type="hidden" name="intent" value="update_assignment_status">
+                                <input type="hidden" name="assignment_id" value="<?php echo (int) ($student['asignacion_activa_id'] ?? 0); ?>">
+                                <input type="hidden" name="target_state" value="finalizada">
+                                <button type="submit" class="student-inline-btn">
+                                    <i class="fas fa-flag-checkered"></i> Finalizar
+                                </button>
+                            </form>
+                            <form
+                                method="POST"
+                                action="index.php?page=admin-students"
+                                class="student-inline-form"
+                                onsubmit="return confirm('Esta accion cancelara la pasantia activa del estudiante. Deseas continuar?');">
+                                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken ?? ''); ?>">
+                                <input type="hidden" name="intent" value="update_assignment_status">
+                                <input type="hidden" name="assignment_id" value="<?php echo (int) ($student['asignacion_activa_id'] ?? 0); ?>">
+                                <input type="hidden" name="target_state" value="cancelada">
+                                <button type="submit" class="student-inline-btn danger">
+                                    <i class="fas fa-ban"></i> Cancelar
+                                </button>
+                            </form>
+                        </div>
+                        <?php endif; ?>
                         <?php else: ?>
                         <span class="pill pill-neutral">Sin pasantia</span>
                         <?php endif; ?>

@@ -541,7 +541,7 @@ $resultLabel = $resultState === 'aprobado'
                     <p class="exam-result-text">
                         <?php
                         echo $resultState === 'aprobado'
-                            ? 'Tu resultado ya quedo registrado y la asignacion se hace automaticamente si la empresa sigue con cupo.'
+                            ? 'Tu resultado ya quedo registrado. El centro debe revisar tu aprobacion antes de asignarte a la empresa.'
                             : ($resultState === 'anulado'
                                 ? 'Se detecto una salida del entorno controlado y el intento quedo anulado.'
                                 : 'Tu intento fue procesado. Puedes volver al listado de empresas cuando quieras.');

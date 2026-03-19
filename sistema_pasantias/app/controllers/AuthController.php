@@ -15,6 +15,144 @@ class AuthController {
         require_once APP_PATH . 'views/auth/login.php';
     }
 
+    public function forgotPassword() {
+        PasswordReset::ensureSchema();
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (!Security::validateCSRFToken($_POST['csrf_token'] ?? '')) {
+                $this->redirectToForgotPassword(
+                    trim((string) ($_POST['token'] ?? '')),
+                    'Token de seguridad invalido',
+                    'error'
+                );
+            }
+
+            $intent = trim((string) ($_POST['intent'] ?? 'request_reset'));
+            if ($intent === 'request_reset') {
+                $data = [
+                    'codigo_centro' => Security::sanitize($_POST['codigo_centro'] ?? ''),
+                    'correo' => Security::sanitize($_POST['correo'] ?? ''),
+                ];
+
+                $errorMessage = $this->validatePasswordResetRequest($data);
+                if ($errorMessage !== null) {
+                    $this->persistForgotPasswordFormData($data);
+                    $this->redirectToForgotPassword('', $errorMessage, 'error');
+                }
+
+                $user = Database::selectOne("
+                    SELECT u.id
+                    FROM usuarios u
+                    JOIN centros c ON c.id = u.centro_id
+                    WHERE u.correo = ?
+                      AND c.codigo_unico = ?
+                      AND u.estado = 'activo'
+                    LIMIT 1
+                ", [$data['correo'], $data['codigo_centro']]);
+                if ($user) {
+                    try {
+                        $resetData = PasswordReset::createForUser((int) $user['id']);
+                        if (DEBUG_MODE) {
+                            $_SESSION['forgot_password_debug_url'] = [
+                                'url' => $this->buildResetUrl($resetData['token']),
+                                'expires_at' => $resetData['expires_at'],
+                            ];
+                        }
+                    } catch (Throwable $exception) {
+                        $this->persistForgotPasswordFormData($data);
+                        $this->redirectToForgotPassword('', $exception->getMessage(), 'error');
+                    }
+                }
+
+                $this->redirectToForgotPassword(
+                    '',
+                    'Si la cuenta existe, generamos un enlace temporal para restablecer la contrasena.',
+                    'success'
+                );
+            }
+
+            if ($intent === 'reset_password') {
+                $token = trim((string) ($_POST['token'] ?? ''));
+                $resetRequest = PasswordReset::findValidRequest($token);
+
+                if (!$resetRequest) {
+                    $this->redirectToForgotPassword('', 'El enlace de recuperacion no es valido o ya vencio', 'error');
+                }
+
+                $newPassword = (string) ($_POST['password'] ?? '');
+                $confirmPassword = (string) ($_POST['confirm_password'] ?? '');
+                $errorMessage = $this->validateRecoveredPassword($newPassword, $confirmPassword);
+
+                if ($errorMessage !== null) {
+                    $this->redirectToForgotPassword($token, $errorMessage, 'error');
+                }
+
+                try {
+                    Database::beginTransaction();
+
+                    if (!Usuario::setPassword((int) $resetRequest['user_id'], $newPassword)) {
+                        throw new RuntimeException('No se pudo actualizar la contrasena');
+                    }
+
+                    if (!PasswordReset::markUsed((int) $resetRequest['id'])) {
+                        throw new RuntimeException('No se pudo cerrar el enlace de recuperacion');
+                    }
+
+                    PasswordReset::invalidateUserTokens((int) $resetRequest['user_id'], (int) $resetRequest['id']);
+                    Database::commit();
+                } catch (Throwable $exception) {
+                    if (Database::getInstance()->inTransaction()) {
+                        Database::rollback();
+                    }
+
+                    $this->redirectToForgotPassword($token, $exception->getMessage(), 'error');
+                }
+
+                $_SESSION['flash_message'] = 'Contrasena restablecida correctamente. Ya puedes iniciar sesion.';
+                $_SESSION['flash_type'] = 'success';
+
+                $loginUrl = 'index.php?page=login';
+                $query = [];
+
+                if (!empty($resetRequest['centro_codigo'])) {
+                    $query['codigo_centro'] = $resetRequest['centro_codigo'];
+                }
+                if (!empty($resetRequest['correo'])) {
+                    $query['correo'] = $resetRequest['correo'];
+                }
+                if (!empty($query)) {
+                    $loginUrl .= '&' . http_build_query($query);
+                }
+
+                header('Location: ' . $loginUrl);
+                exit;
+            }
+
+            $this->redirectToForgotPassword('', 'Accion de recuperacion no reconocida', 'warning');
+        }
+
+        $resetToken = trim((string) ($_GET['token'] ?? ''));
+        $resetRequest = null;
+        $forgotPasswordMode = 'request';
+
+        if ($resetToken !== '') {
+            $resetRequest = PasswordReset::findValidRequest($resetToken);
+            if ($resetRequest) {
+                $forgotPasswordMode = 'reset';
+            } else {
+                $_SESSION['flash_message'] = 'El enlace de recuperacion no es valido o ya vencio';
+                $_SESSION['flash_type'] = 'error';
+            }
+        }
+
+        $csrfToken = Security::generateCSRFToken();
+        $formData = $this->consumeForgotPasswordFormData();
+        $debugResetUrl = $_SESSION['forgot_password_debug_url'] ?? null;
+        unset($_SESSION['forgot_password_debug_url']);
+
+        require_once APP_PATH . 'views/auth/forgot-password.php';
+    }
+
     /**
      * Redirige al index principal.
      */
@@ -259,11 +397,89 @@ class AuthController {
         return $errors;
     }
 
+    private function validatePasswordResetRequest(array $data) {
+        if (empty($data['codigo_centro'])) {
+            return 'El codigo de centro es obligatorio';
+        }
+
+        if (!Security::isValidCenterCode($data['codigo_centro'])) {
+            return 'Formato de codigo de centro invalido';
+        }
+
+        if (!Usuario::centerExists($data['codigo_centro'])) {
+            return 'Codigo de centro invalido o centro inactivo';
+        }
+
+        if (empty($data['correo'])) {
+            return 'El correo es obligatorio';
+        }
+
+        if (!Security::isValidEmail($data['correo'])) {
+            return 'Correo electronico invalido';
+        }
+
+        return null;
+    }
+
+    private function validateRecoveredPassword($password, $confirmPassword) {
+        if ($password === '' || $confirmPassword === '') {
+            return 'Completa ambos campos de contrasena';
+        }
+
+        if (strlen($password) < 8) {
+            return 'La contrasena debe tener al menos 8 caracteres';
+        }
+
+        if (!preg_match('/[A-Z]/', $password)) {
+            return 'La contrasena debe contener al menos una mayuscula';
+        }
+
+        if (!preg_match('/[0-9]/', $password)) {
+            return 'La contrasena debe contener al menos un numero';
+        }
+
+        if ($password !== $confirmPassword) {
+            return 'Las contrasenas no coinciden';
+        }
+
+        return null;
+    }
+
     /**
      * Quita datos sensibles antes de devolver el formulario.
      */
     private function getSafeRegistrationData($data) {
         unset($data['password'], $data['confirm_password']);
         return $data;
+    }
+
+    private function buildResetUrl($token) {
+        return BASE_URL . 'index.php?page=forgot-password&token=' . urlencode((string) $token);
+    }
+
+    private function redirectToForgotPassword($token = '', $message = '', $type = 'info') {
+        if ($message !== '') {
+            $_SESSION['flash_message'] = $message;
+            $_SESSION['flash_type'] = $type;
+        }
+
+        $url = 'index.php?page=forgot-password';
+        if (trim((string) $token) !== '') {
+            $url .= '&token=' . urlencode((string) $token);
+        }
+
+        header('Location: ' . $url);
+        exit;
+    }
+
+    private function persistForgotPasswordFormData(array $data) {
+        $_SESSION['forgot_password_form_data'] = $data;
+    }
+
+    private function consumeForgotPasswordFormData() {
+        $data = $_SESSION['forgot_password_form_data'] ?? [];
+        unset($_SESSION['forgot_password_form_data']);
+
+        return is_array($data) ? $data : [];
     }
 }

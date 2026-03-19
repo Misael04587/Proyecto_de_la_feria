@@ -10,6 +10,11 @@ $meta = [
         'heading' => 'Empresas del centro',
         'description' => 'Consulta cupos, ocupacion y estado actual de las empresas vinculadas a tu centro.',
     ],
+    'questions' => [
+        'title' => 'Preguntas - Sistema EPIC',
+        'heading' => 'Banco de preguntas',
+        'description' => 'Gestiona las preguntas tecnicas por area, sin afectar el historial ya usado en evaluaciones.',
+    ],
     'students' => [
         'title' => 'Estudiantes - Sistema EPIC',
         'heading' => 'Estudiantes registrados',
@@ -88,6 +93,7 @@ $formatDate = function ($value, $withTime = false) {
                 <div class="nav-title">Navegacion</div>
                 <a href="index.php?page=admin-dashboard" class="nav-item<?php echo $currentSection === 'dashboard' ? ' active' : ''; ?>"><i class="fas fa-home nav-icon"></i>Inicio</a>
                 <a href="index.php?page=admin-companies" class="nav-item<?php echo $currentSection === 'companies' ? ' active' : ''; ?>"><i class="fas fa-building nav-icon"></i>Empresas</a>
+                <a href="index.php?page=admin-questions" class="nav-item<?php echo $currentSection === 'questions' ? ' active' : ''; ?>"><i class="fas fa-list-check nav-icon"></i>Preguntas</a>
                 <a href="index.php?page=admin-students" class="nav-item<?php echo $currentSection === 'students' ? ' active' : ''; ?>"><i class="fas fa-users nav-icon"></i>Estudiantes</a>
                 <a href="index.php?page=admin-evaluations" class="nav-item<?php echo $currentSection === 'evaluations' ? ' active' : ''; ?>"><i class="fas fa-clipboard-check nav-icon"></i>Evaluaciones</a>
                 <a href="index.php?page=admin-reports" class="nav-item<?php echo $currentSection === 'reports' ? ' active' : ''; ?>"><i class="fas fa-chart-column nav-icon"></i>Reportes</a>
@@ -131,6 +137,7 @@ $formatDate = function ($value, $withTime = false) {
                         <div class="dropdown-menu">
                             <a href="index.php?page=admin-dashboard" class="dropdown-item"><i class="fas fa-home"></i>Panel principal</a>
                             <a href="index.php?page=admin-companies" class="dropdown-item"><i class="fas fa-building"></i>Empresas</a>
+                            <a href="index.php?page=admin-questions" class="dropdown-item"><i class="fas fa-list-check"></i>Preguntas</a>
                             <a href="index.php?page=admin-students" class="dropdown-item"><i class="fas fa-users"></i>Estudiantes</a>
                             <a href="index.php?page=admin-evaluations" class="dropdown-item"><i class="fas fa-clipboard-check"></i>Evaluaciones</a>
                             <a href="index.php?page=admin-reports" class="dropdown-item"><i class="fas fa-chart-line"></i>Reportes</a>

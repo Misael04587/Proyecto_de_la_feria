@@ -63,13 +63,15 @@
         <span class="pill pill-blue"><?php echo count($evaluations); ?> resultados</span>
     </div>
     <?php if (!empty($evaluations)): ?>
-    <table class="data-table">
+        <table class="data-table">
         <thead>
             <tr>
                 <th>Estudiante</th>
                 <th>Empresa</th>
                 <th>Resultado</th>
                 <th>Nota</th>
+                <th>Seguimiento</th>
+                <th>Acciones</th>
                 <th>Fecha</th>
             </tr>
         </thead>
@@ -82,6 +84,12 @@
                 : ($state === 'pendiente'
                     ? 'pill-orange'
                     : ($state === 'reprobado' ? 'pill-red' : 'pill-neutral'));
+            $hasAssignment = !empty($evaluation['asignacion_id']);
+            $studentHasActiveInternship = (int) ($evaluation['estudiante_pasantias_activas'] ?? 0) > 0;
+            $companySlots = (int) ($evaluation['empresa_cupos'] ?? 0);
+            $companyActiveAssignments = (int) ($evaluation['empresa_asignaciones_activas'] ?? 0);
+            $companyHasRoom = $companyActiveAssignments < $companySlots;
+            $canAssign = $state === 'aprobado' && !$hasAssignment && !$studentHasActiveInternship && $companyHasRoom;
             ?>
             <tr>
                 <td>
@@ -91,16 +99,46 @@
                 </td>
                 <td>
                     <strong><?php echo htmlspecialchars($evaluation['empresa_nombre'] ?? 'Sin empresa'); ?></strong>
-                    <div class="muted-line">
-                        <?php if (!empty($evaluation['asignacion_estado'])): ?>
-                        Pasantia <?php echo htmlspecialchars($evaluation['asignacion_estado']); ?>
-                        <?php else: ?>
-                        Sin asignacion
-                        <?php endif; ?>
-                    </div>
+                    <div class="muted-line"><?php echo $companyActiveAssignments; ?> / <?php echo $companySlots; ?> cupos ocupados</div>
                 </td>
                 <td><span class="pill <?php echo $pillClass; ?>"><?php echo htmlspecialchars(ucfirst($state !== '' ? $state : 'sin estado')); ?></span></td>
                 <td><?php echo $evaluation['nota'] !== null ? htmlspecialchars(number_format((float) $evaluation['nota'], 1)) : 'Sin nota'; ?></td>
+                <td>
+                    <?php if (!empty($evaluation['asignacion_estado'])): ?>
+                    <span class="pill <?php echo ($evaluation['asignacion_estado'] ?? '') === 'activa' ? 'pill-blue' : (($evaluation['asignacion_estado'] ?? '') === 'finalizada' ? 'pill-green' : 'pill-red'); ?>">
+                        <?php echo htmlspecialchars('Pasantia ' . $evaluation['asignacion_estado']); ?>
+                    </span>
+                    <?php elseif ($state === 'aprobado'): ?>
+                    <span class="pill pill-orange">Pendiente de asignacion</span>
+                    <div class="muted-line">El examen fue aprobado y espera revision del centro.</div>
+                    <?php else: ?>
+                    <span class="pill pill-neutral">Sin seguimiento</span>
+                    <?php endif; ?>
+                </td>
+                <td class="evaluation-actions-cell">
+                    <?php if ($canAssign): ?>
+                    <form method="POST" action="index.php?page=admin-evaluations" class="evaluation-action-form">
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken ?? ''); ?>">
+                        <input type="hidden" name="intent" value="assign_evaluation">
+                        <input type="hidden" name="evaluation_id" value="<?php echo (int) ($evaluation['id'] ?? 0); ?>">
+                        <button type="submit" class="evaluation-action-btn">
+                            <i class="fas fa-briefcase"></i> Asignar pasantia
+                        </button>
+                    </form>
+                    <?php elseif ($state === 'aprobado' && !$hasAssignment): ?>
+                    <div class="evaluation-note">
+                        <?php if ($studentHasActiveInternship): ?>
+                        El estudiante ya tiene otra pasantia activa.
+                        <?php elseif (!$companyHasRoom): ?>
+                        La empresa ya completo sus cupos.
+                        <?php else: ?>
+                        La evaluacion ya esta en revision.
+                        <?php endif; ?>
+                    </div>
+                    <?php else: ?>
+                    <span class="muted-line">Sin accion disponible</span>
+                    <?php endif; ?>
+                </td>
                 <td><?php echo htmlspecialchars($formatDate($evaluation['tiempo_fin'] ?? $evaluation['tiempo_inicio'] ?? $evaluation['created_at'] ?? null, true)); ?></td>
             </tr>
             <?php endforeach; ?>

@@ -72,7 +72,7 @@ $getPostulationMeta = function ($evaluacion) {
     }
 
     if ($estado === 'aprobado') {
-        return ['label' => 'Aprobaste el examen', 'class' => 'post-info', 'icon' => 'fa-star'];
+        return ['label' => 'Aprobaste el examen y quedaste pendiente de asignacion', 'class' => 'post-info', 'icon' => 'fa-star'];
     }
 
     if ($estado === 'anulado') {
@@ -784,6 +784,8 @@ if ($evaluacionDetalle) {
                                 <?php echo htmlspecialchars($detailPostulation['label']); ?>.
                                 <?php if (!empty($evaluacionDetalle['fecha_asignacion'])): ?>
                                     La asignacion quedo registrada el <?php echo htmlspecialchars($formatDate($evaluacionDetalle['fecha_asignacion'], false)); ?>.
+                                <?php elseif (($evaluacionDetalle['estado'] ?? '') === 'aprobado'): ?>
+                                    Tu aprobacion quedo lista y ahora el centro debe revisar si te asigna a esta empresa.
                                 <?php elseif (($evaluacionDetalle['estado'] ?? '') === 'reprobado'): ?>
                                     Necesitas mejorar el examen para avanzar a la empresa.
                                 <?php elseif (($evaluacionDetalle['estado'] ?? '') === 'pendiente'): ?>

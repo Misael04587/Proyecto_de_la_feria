@@ -171,6 +171,18 @@ class Usuario {
         );
     }
 
+    public static function setPassword($userId, $newPassword) {
+        $userId = (int) $userId;
+        if ($userId <= 0 || trim((string) $newPassword) === '') {
+            return false;
+        }
+
+        return Database::execute(
+            "UPDATE usuarios SET password = ? WHERE id = ?",
+            [Security::hashPassword($newPassword), $userId]
+        );
+    }
+
     /**
      * Verifica si usuario tiene CV subido.
      */
