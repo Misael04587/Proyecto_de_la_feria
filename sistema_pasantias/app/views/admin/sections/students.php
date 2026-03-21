@@ -79,7 +79,7 @@ $followUpMeta = [
             </select>
         </div>
         <button type="submit" class="card-btn" style="width:auto;padding:14px 20px;"><i class="fas fa-filter"></i> Filtrar</button>
-        <a href="index.php?page=admin-students" class="secondary-inline-btn" style="width:auto;padding:14px 20px;"><i class="fas fa-rotate-left"></i> Limpiar</a>
+        <button type="reset" class="question-secondary-btn" style="width:auto;padding:14px 20px;"><i class="fas fa-rotate-left"></i> Limpiar</button>
         <button
             type="submit"
             form="delete-all-students-form"

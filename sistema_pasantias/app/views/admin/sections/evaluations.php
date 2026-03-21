@@ -93,7 +93,7 @@ $getFollowUpMeta = function ($state) use ($followUpMeta) {
             <input type="date" name="fecha_hasta" id="fecha_hasta" value="<?php echo htmlspecialchars((string) ($filters['fecha_hasta'] ?? '')); ?>">
         </div>
         <button type="submit" class="card-btn" style="width:auto;padding:14px 20px;"><i class="fas fa-filter"></i> Filtrar</button>
-        <a href="index.php?page=admin-evaluations" class="secondary-inline-btn" style="width:auto;padding:14px 20px;"><i class="fas fa-rotate-left"></i> Limpiar</a>
+        <a href="index.php?page=admin-evaluations" class="question-secondary-btn" style="width:auto;padding:14px 20px;"><i class="fas fa-rotate-left"></i> Limpiar</a>
     </form>
 </section>
 
