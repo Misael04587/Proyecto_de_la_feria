@@ -2,6 +2,10 @@
 // app/controllers/AdminController.php
 
 class AdminController {
+    public function __construct() {
+        Asignacion::ensureSchema();
+    }
+
     public function dashboard() {
         $context = $this->buildBaseContext('dashboard');
         $centerId = (int) $context['centro']['id'];

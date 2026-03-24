@@ -2,6 +2,9 @@
 // app/controllers/StudentController.php
 
 class StudentController {
+    public function __construct() {
+        Asignacion::ensureSchema();
+    }
 
     // ============================================
     // MÃ‰TODO PARA SUBIR CV

@@ -8,6 +8,73 @@ class Asignacion {
             return;
         }
 
+        Database::execute("
+            CREATE TABLE IF NOT EXISTS asignaciones (
+                id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                estudiante_id INT NOT NULL,
+                empresa_id INT NOT NULL,
+                fecha_asignacion DATE NOT NULL,
+                estado ENUM('activa', 'finalizada', 'cancelada') NOT NULL DEFAULT 'activa',
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                KEY idx_empresa (empresa_id),
+                KEY idx_estado (estado)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        ");
+
+        $companyColumn = Database::selectOne("SHOW COLUMNS FROM asignaciones LIKE 'empresa_id'");
+        if (!$companyColumn) {
+            Database::execute("
+                ALTER TABLE asignaciones
+                ADD COLUMN empresa_id INT NOT NULL AFTER estudiante_id
+            ");
+        }
+
+        $dateColumn = Database::selectOne("SHOW COLUMNS FROM asignaciones LIKE 'fecha_asignacion'");
+        if (!$dateColumn) {
+            Database::execute("
+                ALTER TABLE asignaciones
+                ADD COLUMN fecha_asignacion DATE NULL AFTER empresa_id
+            ");
+            Database::execute("
+                UPDATE asignaciones
+                SET fecha_asignacion = COALESCE(fecha_asignacion, DATE(created_at), CURDATE())
+            ");
+        }
+
+        $stateColumn = Database::selectOne("SHOW COLUMNS FROM asignaciones LIKE 'estado'");
+        if (!$stateColumn) {
+            Database::execute("
+                ALTER TABLE asignaciones
+                ADD COLUMN estado ENUM('activa', 'finalizada', 'cancelada')
+                    NOT NULL DEFAULT 'activa'
+                    AFTER fecha_asignacion
+            ");
+        }
+
+        $createdAtColumn = Database::selectOne("SHOW COLUMNS FROM asignaciones LIKE 'created_at'");
+        if (!$createdAtColumn) {
+            Database::execute("
+                ALTER TABLE asignaciones
+                ADD COLUMN created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP
+                    AFTER estado
+            ");
+            Database::execute("
+                UPDATE asignaciones
+                SET created_at = COALESCE(created_at, CURRENT_TIMESTAMP)
+            ");
+        }
+
+        $updatedAtColumn = Database::selectOne("SHOW COLUMNS FROM asignaciones LIKE 'updated_at'");
+        if (!$updatedAtColumn) {
+            Database::execute("
+                ALTER TABLE asignaciones
+                ADD COLUMN updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP
+                    ON UPDATE CURRENT_TIMESTAMP
+                    AFTER created_at
+            ");
+        }
+
         $studentIndex = Database::selectOne("SHOW INDEX FROM asignaciones WHERE Key_name = 'estudiante_id'");
         if ($studentIndex && (int) ($studentIndex['Non_unique'] ?? 1) === 0) {
             Database::execute("ALTER TABLE asignaciones DROP INDEX estudiante_id");
@@ -16,6 +83,16 @@ class Asignacion {
         $studentLookupIndex = Database::selectOne("SHOW INDEX FROM asignaciones WHERE Key_name = 'idx_estudiante'");
         if (!$studentLookupIndex) {
             Database::execute("ALTER TABLE asignaciones ADD INDEX idx_estudiante (estudiante_id)");
+        }
+
+        $companyLookupIndex = Database::selectOne("SHOW INDEX FROM asignaciones WHERE Key_name = 'idx_empresa'");
+        if (!$companyLookupIndex) {
+            Database::execute("ALTER TABLE asignaciones ADD INDEX idx_empresa (empresa_id)");
+        }
+
+        $stateLookupIndex = Database::selectOne("SHOW INDEX FROM asignaciones WHERE Key_name = 'idx_estado'");
+        if (!$stateLookupIndex) {
+            Database::execute("ALTER TABLE asignaciones ADD INDEX idx_estado (estado)");
         }
 
         $pairIndex = Database::selectOne("SHOW INDEX FROM asignaciones WHERE Key_name = 'uniq_asignacion_estudiante_empresa'");
